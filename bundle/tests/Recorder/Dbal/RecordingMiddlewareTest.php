@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Dan\Probe\Tests\Recorder\Dbal;
 
-use Dan\Probe\Recorder\Dbal\RecordingConnectionFactory;
 use Dan\Probe\Recorder\Dbal\RecordingMiddleware;
 use Dan\Probe\Recorder\QueryRecorder;
+use Doctrine\DBAL\Configuration;
 use Doctrine\DBAL\DriverManager;
 use PHPUnit\Framework\TestCase;
 
@@ -15,10 +15,12 @@ final class RecordingMiddlewareTest extends TestCase
     public function testRecordsOnlyTheActiveScopeWithParametersAndDurations(): void
     {
         $recorder = new QueryRecorder();
-        $connection = (new RecordingConnectionFactory())->create(
-            connection: DriverManager::getConnection(['url' => 'sqlite:///:memory:']),
-            middleware: new RecordingMiddleware(recorder: $recorder),
-        );
+        // The middleware rides the connection's own configuration - in a
+        // measured runtime bin/dan-console passes it to MySQLFactory the
+        // same way.
+        $configuration = new Configuration();
+        $configuration->setMiddlewares([new RecordingMiddleware(recorder: $recorder)]);
+        $connection = DriverManager::getConnection(['url' => 'sqlite:///:memory:'], $configuration);
 
         $connection->fetchOne('SELECT 0');
         $recorder->start();

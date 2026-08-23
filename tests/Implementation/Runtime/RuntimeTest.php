@@ -16,7 +16,7 @@ use PHPUnit\Framework\TestCase;
 
 final class RuntimeTest extends TestCase
 {
-    public function testRunsBinConsoleFromTheWorkingDirectoryWithTheCellDatabaseEnvironment(): void
+    public function testRunsTheDanConsoleEntryFromTheWorkingDirectoryWithTheCellDatabaseEnvironment(): void
     {
         $runner = $this->createRecordingRunner();
         $runtime = new Runtime(
@@ -35,7 +35,7 @@ final class RuntimeTest extends TestCase
             'php',
             '-d',
             'memory_limit=-1',
-            'bin/console',
+            'bin/dan-console',
             'dan:execute',
             '--scenario=product-search',
         ], $command->arguments);

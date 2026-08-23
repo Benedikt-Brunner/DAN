@@ -18,10 +18,16 @@ final class RuntimeFactoryTest extends TestCase
 {
     private string $workDirectory;
 
+    private string $probeBundleDirectory;
+
     protected function setUp(): void
     {
         $this->workDirectory = sys_get_temp_dir() . '/dan-runtime-factory-' . bin2hex(random_bytes(4));
         mkdir($this->workDirectory);
+        // The factory stages the probe's console entry from the bundle.
+        $this->probeBundleDirectory = $this->workDirectory . '/bundle';
+        mkdir($this->probeBundleDirectory . '/src/Resources/skeleton', 0o777, true);
+        file_put_contents($this->probeBundleDirectory . '/src/Resources/skeleton/dan-console', "#!/usr/bin/env php\n<?php\n");
     }
 
     protected function tearDown(): void
@@ -34,7 +40,7 @@ final class RuntimeFactoryTest extends TestCase
         $runner = $this->createSkeletonSimulatingRunner();
         $factory = new RuntimeFactory(
             runtimesDirectory: Path::fromString($this->workDirectory)->join('runtimes'),
-            probeBundlePath: Path::fromString('/dan/bundle'),
+            probeBundlePath: Path::fromString($this->probeBundleDirectory),
             processRunner: $runner,
         );
 
@@ -57,13 +63,21 @@ final class RuntimeFactoryTest extends TestCase
                 'composer',
                 'config',
                 'repositories.dan-probe',
-                '{"type":"path","url":"\/dan\/bundle","options":{"symlink":true}}',
+                json_encode([
+                    'type' => 'path',
+                    'url' => $this->probeBundleDirectory,
+                    'options' => ['symlink' => true],
+                ], \JSON_THROW_ON_ERROR),
             ],
             [
                 'composer',
                 'config',
                 'repositories.dan-lib',
-                '{"type":"path","url":"\/dan\/lib","options":{"symlink":true}}',
+                json_encode([
+                    'type' => 'path',
+                    'url' => $this->workDirectory . '/lib',
+                    'options' => ['symlink' => true],
+                ], \JSON_THROW_ON_ERROR),
             ],
             [
                 'composer',
@@ -97,7 +111,7 @@ final class RuntimeFactoryTest extends TestCase
         $runner = $this->createSkeletonSimulatingRunner();
         $factory = new RuntimeFactory(
             runtimesDirectory: Path::fromString($this->workDirectory)->join('runtimes'),
-            probeBundlePath: Path::fromString('/dan/bundle'),
+            probeBundlePath: Path::fromString($this->probeBundleDirectory),
             processRunner: $runner,
         );
 
@@ -149,7 +163,7 @@ final class RuntimeFactoryTest extends TestCase
         $runner = $this->createSkeletonSimulatingRunner();
         $factory = new RuntimeFactory(
             runtimesDirectory: Path::fromString($this->workDirectory)->join('runtimes'),
-            probeBundlePath: Path::fromString('/dan/bundle'),
+            probeBundlePath: Path::fromString($this->probeBundleDirectory),
             processRunner: $runner,
         );
 
@@ -174,11 +188,11 @@ final class RuntimeFactoryTest extends TestCase
     {
         $runner = $this->createSkeletonSimulatingRunner();
         $runtimeDirectory = $this->workDirectory . '/runtimes/release-6.6.5.0';
-        mkdir($runtimeDirectory, 0o777, true);
+        mkdir($runtimeDirectory . '/bin', 0o777, true);
         touch($runtimeDirectory . '/.dan-runtime');
         $factory = new RuntimeFactory(
             runtimesDirectory: Path::fromString($this->workDirectory)->join('runtimes'),
-            probeBundlePath: Path::fromString('/dan/bundle'),
+            probeBundlePath: Path::fromString($this->probeBundleDirectory),
             processRunner: $runner,
         );
 
@@ -189,6 +203,8 @@ final class RuntimeFactoryTest extends TestCase
         );
 
         self::assertSame([], $runner->commands);
+        // Reuse still re-stages the console entry so probe updates propagate.
+        self::assertFileExists($runtimeDirectory . '/bin/dan-console');
     }
 
     /**
@@ -224,6 +240,12 @@ final class RuntimeFactoryTest extends TestCase
                     $command->workingDirectory->join('config', 'bundles.php')->toString(),
                     "<?php\n\nreturn [\n    Shopware\\Core\\Framework\\Framework::class => ['all' => true],\n];\n",
                 );
+                // A real skeleton ships bin/ - the factory stages
+                // bin/dan-console next to bin/console afterwards.
+                $binDirectory = $command->workingDirectory->join('bin')->toString();
+                if (!is_dir($binDirectory)) {
+                    mkdir($binDirectory, 0o777, true);
+                }
             }
         };
     }

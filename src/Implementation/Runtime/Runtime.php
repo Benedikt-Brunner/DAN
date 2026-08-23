@@ -25,9 +25,35 @@ final class Runtime
     ) {}
 
     /**
+     * Runs a probe command through DAN's console entry, which boots the
+     * kernel with the recording middleware on the kernel connection.
+     *
      * @param list<string> $args
      */
     public function run(array $args, DatabaseInstance $database): void
+    {
+        $this->console(entry: 'bin/dan-console', args: $args, database: $database);
+    }
+
+    public function installShopware(DatabaseInstance $database): void
+    {
+        // Creates schema, runs migrations and basic setup against the (empty)
+        // container. Only runs on snapshot cache misses - cache hits import a
+        // full dump that already contains everything. Uses the skeleton's own
+        // entry: its bootstrap handles the no-database INSTALL context.
+        $this->console(entry: 'bin/console', args: [
+            'system:install',
+            '--create-database',
+            '--basic-setup',
+            '--force',
+            '--no-interaction',
+        ], database: $database);
+    }
+
+    /**
+     * @param list<string> $args
+     */
+    private function console(string $entry, array $args, DatabaseInstance $database): void
     {
         $this->processRunner->mustRun(
             command: new ProcessCommand(
@@ -35,7 +61,7 @@ final class Runtime
                     'php',
                     '-d',
                     'memory_limit=-1',
-                    'bin/console',
+                    $entry,
                     ...$args,
                 ],
                 timeout: null,
@@ -50,19 +76,5 @@ final class Runtime
             ),
             outputListener: $this->outputListener,
         );
-    }
-
-    public function installShopware(DatabaseInstance $database): void
-    {
-        // Creates schema, runs migrations and basic setup against the (empty)
-        // container. Only runs on snapshot cache misses - cache hits import a
-        // full dump that already contains everything.
-        $this->run(args: [
-            'system:install',
-            '--create-database',
-            '--basic-setup',
-            '--force',
-            '--no-interaction',
-        ], database: $database);
     }
 }

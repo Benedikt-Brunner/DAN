@@ -8,9 +8,8 @@ use Dan\Probe\DanProbeBundle;
 use Dan\Probe\Execution\Command\ExecuteScenariosCommand;
 use Dan\Probe\Execution\Measurement\ScenarioMeasurer;
 use Dan\Probe\Execution\Result\ScenarioResultWriter;
-use Dan\Probe\Recorder\Dbal\RecordingConnectionFactory;
-use Dan\Probe\Recorder\Dbal\RecordingMiddleware;
 use Dan\Probe\Recorder\QueryRecorder;
+use Dan\Probe\Recorder\RecordingBootstrap;
 use Dan\Probe\Scenario\Corpus\ProductDeepReadScenario;
 use Dan\Probe\Scenario\Corpus\ProductKeywordListingScenario;
 use Dan\Probe\Scenario\Corpus\SyntheticJsonPathScenario;
@@ -37,8 +36,6 @@ final class ServiceConfigurationTest extends TestCase
             SyntheticJsonPathScenario::class,
             DatasetSeeder::class,
             QueryRecorder::class,
-            RecordingMiddleware::class,
-            RecordingConnectionFactory::class,
             ScenarioMeasurer::class,
             ScenarioResultWriter::class,
             SyntheticSchemaInstaller::class,
@@ -61,6 +58,14 @@ final class ServiceConfigurationTest extends TestCase
             TaggedIteratorArgument::class,
             $container->getDefinition(ScenarioRegistry::class)->getArgument('$scenarios'),
         );
+        // The container's recorder must be the instance the recording
+        // middleware writes into - RecordingBootstrap hands it across the
+        // pre-container boundary.
+        self::assertSame([
+            RecordingBootstrap::class,
+            'recorder',
+        ], $container->getDefinition(QueryRecorder::class)->getFactory());
+
         self::assertTrue($container->getDefinition(ProductKeywordListingScenario::class)->hasTag('dan.scenario'));
         self::assertTrue($container->getDefinition(ProductDeepReadScenario::class)->hasTag('dan.scenario'));
         self::assertTrue($container->getDefinition(SyntheticJsonPathScenario::class)->hasTag('dan.scenario'));
