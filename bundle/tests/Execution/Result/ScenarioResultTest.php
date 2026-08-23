@@ -9,6 +9,7 @@ use Dan\Probe\Execution\Result\ScenarioResult;
 use Dan\Probe\Execution\Result\ScenarioResultWriter;
 use Dan\Probe\Execution\Result\StatementResult;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 
 final class ScenarioResultTest extends TestCase
 {
@@ -92,5 +93,26 @@ final class ScenarioResultTest extends TestCase
             }
             rmdir($directory);
         }
+    }
+
+    public function testWriterFailsLoudlyWhenTheOutputDirectoryDoesNotExist(): void
+    {
+        $result = new ScenarioResult(
+            scenario: 'product.deep-read',
+            entity: 'product',
+            dalVersion: null,
+            iterations: 0,
+            wallSamplesNs: [],
+            statements: [],
+        );
+        $missingDirectory = sys_get_temp_dir() . '/dan-scenario-result-missing-' . bin2hex(random_bytes(8));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Could not write the scenario result for "product.deep-read"');
+
+        (new ScenarioResultWriter())->write(
+            outputDirectory: Path::fromString($missingDirectory),
+            result: $result,
+        );
     }
 }
