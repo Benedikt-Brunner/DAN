@@ -1,0 +1,91 @@
+name: Calibration
+
+# - A/A: the same DAL as baseline AND candidate. Must report zero SQL changes
+#   and latency deltas within the gate. Every failure here means DAN's
+#   noise-control story is broken and real reports cannot be trusted until
+#   it's fixed.
+#
+# - Injected regression: a DAL with a known, deliberate pessimization
+#   (calibration/pessimizations/*.patch) diffed against its unpatched self.
+#   DAN MUST flag it - this measures the false-negative rate.
+
+on:
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+
+env:
+  DAL_BASELINE: 'v6.6.10.0'
+
+jobs:
+  a-a:
+    name: A/A run (false-positive check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_sqlite, pdo_mysql, intl, zip, gd
+          coverage: none
+      - run: composer install --no-interaction --no-progress
+      - name: A/A profile - identical DAL on both sides
+        run: |
+          bin/dan run \
+            --dal "$DAL_BASELINE" --dal "$DAL_BASELINE" \
+            --db mysql:8.0 \
+            --tier S \
+            --iterations 30 --warmup 5 --blocks 4 \
+            --max-regression 10 --fail-on-sql-change
+      - name: Upload calibration record
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: calibration-aa-${{ github.run_id }}
+          path: runs/
+          retention-days: 90
+
+  injected-regression:
+    name: Injected regression (false-negative check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_sqlite, pdo_mysql, intl, zip, gd
+          coverage: none
+      - run: composer install --no-interaction --no-progress
+      - name: Check out and pessimize a DAL copy
+        run: |
+          git clone --depth 1 --branch "$DAL_BASELINE" https://github.com/shopware/shopware.git /tmp/shopware-pessimized
+          cd /tmp/shopware-pessimized
+          for patch in "$GITHUB_WORKSPACE"/calibration/pessimizations/*.patch; do
+            [ -e "$patch" ] || { echo "No pessimization patches yet - see calibration/pessimizations/README.md"; exit 0; }
+            git apply "$patch"
+          done
+      - name: DAN must flag the pessimization
+        run: |
+          shopt -s nullglob
+          patches=("$GITHUB_WORKSPACE"/calibration/pessimizations/*.patch)
+          if [ ${#patches[@]} -eq 0 ]; then
+            echo "Skipped: no pessimization patches curated yet."
+            exit 0
+          fi
+          # Inverted assertion: a passing gate here is the failure.
+          if bin/dan run \
+            --dal "$DAL_BASELINE" --dal /tmp/shopware-pessimized \
+            --db mysql:8.0 \
+            --tier S \
+            --iterations 30 --warmup 5 --blocks 4 \
+            --max-regression 10; then
+            echo "::error::DAN failed to detect a known injected regression - false-negative!"
+            exit 1
+          fi
+      - name: Upload calibration record
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: calibration-injected-${{ github.run_id }}
+          path: runs/
+          retention-days: 90

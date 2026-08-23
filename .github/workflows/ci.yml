@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  quality:
+    name: Lint, static analysis, unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_sqlite
+          coverage: none
+      - run: composer install --no-interaction --no-progress
+      - name: php-cs-fixer
+        run: vendor/bin/php-cs-fixer fix --dry-run --diff
+      - name: phpcs
+        run: vendor/bin/phpcs
+      - name: phpstan (harness)
+        run: vendor/bin/phpstan analyse --no-progress
+      - name: phpunit (unit)
+        run: vendor/bin/phpunit
+
+  bundle-quality:
+    name: Bundle static analysis + kernel integration tests
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: dan
+          MYSQL_DATABASE: dan_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h localhost -pdan"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_mysql, intl, zip, gd
+          coverage: none
+      - run: composer install --no-interaction --no-progress
+        working-directory: bundle
+      - name: phpstan (bundle, against shopware/core)
+        run: vendor/bin/phpstan analyse --no-progress
+        working-directory: bundle
+      - name: phpunit (kernel integration)
+        run: vendor/bin/phpunit
+        working-directory: bundle
+        env:
+          DATABASE_URL: mysql://root:dan@127.0.0.1:3306/dan_test
+
+  e2e-smoke:
+    name: E2E smoke (tiny protocol)
+    runs-on: ubuntu-latest
+    # Trust layer 3: the full pipeline - provision a released Shopware,
+    # start containers, seed, measure, merge, diff. Deliberately tiny so it
+    # stays PR-viable. The A/A shape (same --dal twice) doubles as a fast
+    # sanity check of the noise-control path.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_sqlite, pdo_mysql, intl, zip, gd
+          coverage: none
+      - run: composer install --no-interaction --no-progress
+      - name: Run tiny A/A profile
+        run: ./tools/e2e-smoke.sh
+      - name: Upload session artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-smoke-session
+          path: runs/
+          retention-days: 7
