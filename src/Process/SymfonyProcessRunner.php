@@ -11,30 +11,34 @@ final class SymfonyProcessRunner implements ProcessRunner
 {
     public function run(ProcessCommand $command): bool
     {
-        return $this->execute(command: $command, mustSucceed: false);
+        return $this->execute(command: $command, mustSucceed: false, outputListener: null);
     }
 
-    public function mustRun(ProcessCommand $command): void
+    public function mustRun(ProcessCommand $command, ?OutputListener $outputListener = null): void
     {
-        $this->execute(command: $command, mustSucceed: true);
+        $this->execute(command: $command, mustSucceed: true, outputListener: $outputListener);
     }
 
-    private function execute(ProcessCommand $command, bool $mustSucceed): bool
+    private function execute(ProcessCommand $command, bool $mustSucceed, ?OutputListener $outputListener): bool
     {
         $input = null;
         $output = null;
         try {
             $input = $this->openInput($command);
             $output = $this->openOutput($command);
-            $process = new Process($command->arguments);
+            $process = new Process(
+                $command->arguments,
+                $command->workingDirectory?->toString(),
+                $command->environment === [] ? null : $command->environment,
+            );
             $process->setTimeout($command->timeout?->toSecondsFloat());
             if ($input !== null) {
                 $process->setInput($input);
             }
             if ($mustSucceed) {
-                $process->mustRun($this->outputCallback($output));
+                $process->mustRun($this->outputCallback(output: $output, outputListener: $outputListener));
             } else {
-                $process->run($this->outputCallback($output));
+                $process->run($this->outputCallback(output: $output, outputListener: $outputListener));
             }
 
             return $process->isSuccessful();
@@ -81,14 +85,15 @@ final class SymfonyProcessRunner implements ProcessRunner
      *
      * @return (callable(string, string): void)|null
      */
-    private function outputCallback($output): ?callable
+    private function outputCallback($output, ?OutputListener $outputListener): ?callable
     {
-        if ($output === null) {
+        if ($output === null && $outputListener === null) {
             return null;
         }
 
-        return function (string $type, string $data) use ($output): void {
-            if ($type === Process::OUT && fwrite($output, $data) === false) {
+        return function (string $type, string $data) use ($output, $outputListener): void {
+            $outputListener?->onOutput($data);
+            if ($output !== null && $type === Process::OUT && fwrite($output, $data) === false) {
                 throw new RuntimeException('Could not write process output.');
             }
         };

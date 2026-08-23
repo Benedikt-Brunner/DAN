@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace Dan\Harness\Implementation\Runtime;
 
 use Dan\Harness\Database\DatabaseInstance;
+use Dan\Harness\Process\OutputListener;
+use Dan\Harness\Process\ProcessCommand;
+use Dan\Harness\Process\ProcessRunner;
 use Dan\Lib\Filesystem\Path;
-use Symfony\Component\Console\Output\OutputInterface;
-use Symfony\Component\Process\Process;
 
 /**
  * Executable runtime for a DAL implementation.
@@ -19,7 +20,8 @@ final class Runtime
 {
     public function __construct(
         private readonly Path $workingDirectory,
-        private readonly OutputInterface $output,
+        private readonly ProcessRunner $processRunner,
+        private readonly ?OutputListener $outputListener = null,
     ) {}
 
     /**
@@ -27,29 +29,27 @@ final class Runtime
      */
     public function run(array $args, DatabaseInstance $database): void
     {
-        $process = new Process(
-            [
-                'php',
-                '-d',
-                'memory_limit=-1',
-                'bin/console',
-                ...$args,
-            ],
-            $this->workingDirectory->toString(),
-            [
-                'DATABASE_URL' => $database->databaseUrl(),
-                'APP_ENV' => 'prod',
-                'APP_SECRET' => 'dan-not-a-secret',
-                'APP_URL' => 'http://localhost:8000',
-                'SHOPWARE_SKIP_WEBINSTALLER' => '1',
-            ],
-            timeout: null,
+        $this->processRunner->mustRun(
+            command: new ProcessCommand(
+                arguments: [
+                    'php',
+                    '-d',
+                    'memory_limit=-1',
+                    'bin/console',
+                    ...$args,
+                ],
+                timeout: null,
+                workingDirectory: $this->workingDirectory,
+                environment: [
+                    'DATABASE_URL' => $database->databaseUrl(),
+                    'APP_ENV' => 'prod',
+                    'APP_SECRET' => 'dan-not-a-secret',
+                    'APP_URL' => 'http://localhost:8000',
+                    'SHOPWARE_SKIP_WEBINSTALLER' => '1',
+                ],
+            ),
+            outputListener: $this->outputListener,
         );
-        $process->mustRun(function (string $type, string $buffer): void {
-            if ($this->output->isVerbose()) {
-                $this->output->write($buffer);
-            }
-        });
     }
 
     public function installShopware(DatabaseInstance $database): void

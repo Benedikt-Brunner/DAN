@@ -8,5 +8,5 @@ interface ProcessRunner
 {
     public function run(ProcessCommand $command): bool;
 
-    public function mustRun(ProcessCommand $command): void;
+    public function mustRun(ProcessCommand $command, ?OutputListener $outputListener = null): void;
 }

@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace Dan\Harness\Implementation\Runtime;
 
+use Dan\Harness\Console\VerboseProcessOutputListener;
 use Dan\Harness\Implementation\Identity\Identity;
 use Dan\Harness\Implementation\Reference\Reference;
 use Dan\Harness\Implementation\Reference\ReferenceType;
+use Dan\Harness\Process\ProcessRunner;
+use Dan\Harness\Process\SymfonyProcessRunner;
 use Dan\Lib\Filesystem\Path;
 use RuntimeException;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -31,6 +34,7 @@ final class RuntimeFactory
     public function __construct(
         private readonly Path $runtimesDirectory,
         private readonly Path $probeBundlePath,
+        private readonly ProcessRunner $processRunner = new SymfonyProcessRunner(),
     ) {}
 
     public function create(Reference $reference, Identity $identity, OutputInterface $output): Runtime
@@ -42,7 +46,7 @@ final class RuntimeFactory
         if (file_exists($workingDirectory->join('.dan-runtime')->toString())) {
             $output->writeln(sprintf('  Reusing DAL runtime for <info>%s</info> at %s', $identity->label, $workingDirectory->toString()));
 
-            return new Runtime(workingDirectory: $workingDirectory, output: $output);
+            return $this->createRuntime(workingDirectory: $workingDirectory, output: $output);
         }
 
         $output->writeln(sprintf('  Building DAL runtime for <info>%s</info> at %s', $identity->label, $workingDirectory->toString()));
@@ -125,7 +129,16 @@ final class RuntimeFactory
 
         touch($workingDirectory->join('.dan-runtime')->toString());
 
-        return new Runtime(workingDirectory: $workingDirectory, output: $output);
+        return $this->createRuntime(workingDirectory: $workingDirectory, output: $output);
+    }
+
+    private function createRuntime(Path $workingDirectory, OutputInterface $output): Runtime
+    {
+        return new Runtime(
+            workingDirectory: $workingDirectory,
+            processRunner: $this->processRunner,
+            outputListener: new VerboseProcessOutputListener($output),
+        );
     }
 
     private function registerProbeBundle(Path $workingDirectory): void
