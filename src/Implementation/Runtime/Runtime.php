@@ -18,6 +18,12 @@ use Dan\Lib\Filesystem\Path;
  */
 final class Runtime
 {
+    /**
+     * The probe's console entry, staged next to the skeleton's bin/console by
+     * the runtime factory.
+     */
+    private const DAN_CONSOLE_ENTRY = 'bin/dan-console';
+
     public function __construct(
         private readonly Path $workingDirectory,
         private readonly ProcessRunner $processRunner,
@@ -32,7 +38,7 @@ final class Runtime
      */
     public function run(array $args, DatabaseInstance $database): void
     {
-        $this->console(entry: 'bin/dan-console', args: $args, database: $database);
+        $this->console(entry: self::DAN_CONSOLE_ENTRY, args: $args, database: $database);
     }
 
     public function installShopware(DatabaseInstance $database): void
