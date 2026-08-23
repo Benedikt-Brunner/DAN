@@ -1,7 +1,7 @@
 {
     "name": "dan/harness",
     "description": "DAL ANalyzer - repeatable, isolated profiling of the SQL produced by Shopware's DAL.",
-    "license": "proprietary",
+    "license": "MIT",
     "type": "project",
     "require": {
         "dan/lib": "^1.0",

@@ -2,7 +2,7 @@
     "name": "dan/lib",
     "version": "1.0.0",
     "description": "Framework-independent contracts and utilities shared by DAN's orchestrator and probe bundle.",
-    "license": "proprietary",
+    "license": "MIT",
     "type": "library",
     "require": {
         "php": ">=8.2"

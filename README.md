@@ -1,5 +1,9 @@
 # DAN — DAL ANalyzer
 
+[![CI](https://github.com/Benedikt-Brunner/DAN/actions/workflows/ci.yml/badge.svg)](https://github.com/Benedikt-Brunner/DAN/actions/workflows/ci.yml)
+[![Calibration](https://github.com/Benedikt-Brunner/DAN/actions/workflows/calibration.yml/badge.svg)](https://github.com/Benedikt-Brunner/DAN/actions/workflows/calibration.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 Repeatable, isolated profiling of the **SQL produced by Shopware's DAL**: both *what* SQL a given DAL implementation generates (inspectable, diffable) and *how well* that SQL executes against representative workloads on a MySQL/MariaDB version matrix.
 
 Generation *time* is explicitly out of scope — producing the SQL is never the bottleneck.
@@ -44,6 +48,8 @@ Contributor and agent documentation — repository layout, commands, design rule
 See [ROADMAP.md](ROADMAP.md) — phased implementation plan (toolchain split, Pest/Infection/Eris adoption, pipeline hardening, result-set equivalence, scenario auto-discovery, `dan explore`) plus the testing decision log.
 
 ## Status
+
+**Pre-1.0 — no stability guarantees.** Persisted formats, CLI flags, and APIs change without backward-compatibility shims until the first release.
 
 Scaffold. Deterministic core (protocol, scheduling, normalization, diffing, storage) is implemented and unit-tested. Known-unproven parts, in dependency order:
 

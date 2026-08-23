@@ -1,7 +1,7 @@
 {
     "name": "dan/probe",
     "description": "In-app measurement agent for DAN: executes corpus scenarios against the DAL, records the produced SQL, and seeds deterministic datasets.",
-    "license": "proprietary",
+    "license": "MIT",
     "type": "symfony-bundle",
     "require": {
         "dan/lib": "^1.0",
