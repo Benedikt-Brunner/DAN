@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Dan\Probe\Execution\Command;
 
-use Dan\Lib\Filesystem\Path;
+use Dan\Lib\Filesystem\AbsolutePath;
 use Dan\Probe\Execution\Measurement\ScenarioMeasurer;
 use Dan\Probe\Execution\Result\ScenarioResultWriter;
 use Dan\Probe\Scenario\ScenarioRegistry;
@@ -36,7 +36,7 @@ final class ExecuteScenariosCommand extends Command
             ->addOption('iterations', null, InputOption::VALUE_REQUIRED, 'Measured iterations per scenario.', '10')
             ->addOption('warmup', null, InputOption::VALUE_REQUIRED, 'Warmup iterations per scenario (recorded SQL is kept, timings are discarded).', '0')
             ->addOption('filter', null, InputOption::VALUE_REQUIRED, 'Scenario name filter (substring match).')
-            ->addOption('output-dir', null, InputOption::VALUE_REQUIRED, 'Directory to write one JSON result file per scenario.');
+            ->addOption('output-dir', null, InputOption::VALUE_REQUIRED, 'Absolute directory to write one JSON result file per scenario. Must be absolute: this command runs with the DAL runtime as working directory.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -49,7 +49,9 @@ final class ExecuteScenariosCommand extends Command
 
             return Command::INVALID;
         }
-        $outputDirectory = Path::fromString($outputDir);
+        // A relative path would resolve against the runtime's working
+        // directory instead of the harness's - reject it at the boundary.
+        $outputDirectory = AbsolutePath::fromString($outputDir);
         $filter = $input->getOption('filter');
         $filter = is_string($filter) ? $filter : null;
 
