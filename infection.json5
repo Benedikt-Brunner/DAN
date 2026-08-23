@@ -19,6 +19,9 @@
         ]
     },
     "testFramework": "phpunit",
+    // Pest-DSL files (tests/Arch) have no test classes - plain PHPUnit runs
+    // the unit suite only.
+    "testFrameworkOptions": "--testsuite=unit",
     "timeout": 10,
     "logs": {
         "text": "infection.log",
