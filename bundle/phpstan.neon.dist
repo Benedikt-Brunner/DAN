@@ -1,0 +1,15 @@
+# Static analysis for the probe bundle, analyzed against the shopware/core
+# dev dependency (run `composer install` in bundle/ first).
+includes:
+    - vendor/shipmonk/dead-code-detector/rules.neon
+    - vendor/phpstan/phpstan-deprecation-rules/rules.neon
+
+parameters:
+    level: max
+    treatPhpDocTypesAsCertain: false
+    paths:
+        - src
+        - tests
+rules:
+    # Autoloaded via the bundle's own autoload-dev mapping to ../dev/.
+    - Dan\Harness\Dev\PhpStan\RequireNamedArgumentsRule

@@ -1,0 +1,45 @@
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+
+    Dan\Probe\Scenario\ScenarioRegistry:
+        arguments:
+            $scenarios: !tagged_iterator dan.scenario
+
+    # Corpus scenarios
+    Dan\Probe\Scenario\Corpus\ProductKeywordListingScenario:
+        tags:
+            - { name: dan.scenario }
+
+    Dan\Probe\Scenario\Corpus\ProductDeepReadScenario:
+        tags:
+            - { name: dan.scenario }
+
+    Dan\Probe\Scenario\Corpus\SyntheticJsonPathScenario:
+        tags:
+            - { name: dan.scenario }
+
+    Dan\Probe\Seeding\Dataset\DatasetSeeder: ~
+    Dan\Probe\Recorder\QueryRecorder:
+        public: true
+    Dan\Probe\Recorder\Dbal\RecordingMiddleware: ~
+    Dan\Probe\Recorder\Dbal\RecordingConnectionFactory: ~
+    dan.probe.recording_connection:
+        class: Doctrine\DBAL\Connection
+        decorates: Doctrine\DBAL\Connection
+        factory: ['@Dan\Probe\Recorder\Dbal\RecordingConnectionFactory', create]
+        arguments:
+            $connection: '@dan.probe.recording_connection.inner'
+            $middleware: '@Dan\Probe\Recorder\Dbal\RecordingMiddleware'
+    Dan\Probe\Execution\Measurement\ScenarioMeasurer: ~
+    Dan\Probe\Execution\Result\ScenarioResultWriter: ~
+
+    # Shopware's EntityCompilerPass creates dan_synthetic_blob.repository from
+    # the autoconfigured definition using that runtime's repository signature.
+    Dan\Probe\Synthetic\SyntheticBlobDefinition: ~
+    Dan\Probe\Synthetic\SyntheticSchemaInstaller: ~
+
+    # In-app measurement agent. #[AsCommand] supplies the console.command tag.
+    Dan\Probe\Execution\Command\ExecuteScenariosCommand: ~
+    Dan\Probe\Seeding\Command\SeedTierCommand: ~
