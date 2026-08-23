@@ -1,0 +1,129 @@
+<?php
+
+// PHPStan stub: Eris's generator factory functions carry no return types
+// (several build their argument lists via func_get_args()), so every
+// composition site would degrade to mixed at level max. This pins them to
+// the Eris\Generator interface; element types are re-established at the
+// call sites through DomainGenerators' as*() narrowers. The interface is
+// re-declared here because stub files only see other stubs.
+
+namespace Eris;
+
+/**
+ * @template-covariant T
+ */
+interface Generator
+{
+}
+
+namespace Eris\Generator;
+
+use Eris\Generator;
+
+/**
+ * @param Generator<mixed> $innerGenerator
+ *
+ * @return Generator<mixed>
+ */
+function bind(Generator $innerGenerator, callable $outerGeneratorFactory)
+{
+}
+
+/**
+ * @return Generator<bool>
+ */
+function bool()
+{
+}
+
+/**
+ * @param int $lowerLimit
+ * @param int $upperLimit
+ *
+ * @return Generator<int>
+ */
+function choose($lowerLimit, $upperLimit)
+{
+}
+
+/**
+ * @param mixed $value
+ *
+ * @return Generator<mixed>
+ */
+function constant($value)
+{
+}
+
+/**
+ * @param mixed ...$elements
+ *
+ * @return Generator<mixed>
+ */
+function elements(...$elements)
+{
+}
+
+/**
+ * @param Generator<mixed> $generator
+ *
+ * @return Generator<mixed>
+ */
+function map(callable $function, Generator $generator)
+{
+}
+
+/**
+ * @param Generator<mixed> $singleElementGenerator
+ *
+ * @return Generator<list<mixed>>
+ */
+function seq(Generator $singleElementGenerator)
+{
+}
+
+/**
+ * @return Generator<string>
+ */
+function string()
+{
+}
+
+/**
+ * @param list<mixed> $input
+ *
+ * @return Generator<list<mixed>>
+ */
+function subset($input)
+{
+}
+
+/**
+ * @param callable $filter
+ * @param Generator<mixed> $generator
+ * @param int $maximumAttempts
+ *
+ * @return Generator<mixed>
+ */
+function suchThat($filter, Generator $generator, $maximumAttempts = 100)
+{
+}
+
+/**
+ * @param Generator<mixed> ...$generators
+ *
+ * @return Generator<list<mixed>>
+ */
+function tuple(...$generators)
+{
+}
+
+/**
+ * @param int $size
+ * @param Generator<mixed> $elementsGenerator
+ *
+ * @return Generator<list<mixed>>
+ */
+function vector($size, Generator $elementsGenerator)
+{
+}

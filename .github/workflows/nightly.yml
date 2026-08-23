@@ -1,0 +1,69 @@
+name: Nightly deep checks
+
+# The slow, thorough variants of the PR-gated checks:
+#
+# - Full-src mutation report (infection.full.json5). Unlike the PR quality
+#   gate - which mutates only the deterministic core and enforces a minimum
+#   covered MSI - this run covers the whole harness and never fails the
+#   build: it exists to watch scope drift, i.e. boundary code that grew
+#   logic without growing tests.
+#
+# - High-iteration property tests. PR runs keep Eris's default 100
+#   iterations per property; this run multiplies the sampled input space
+#   with a fresh random seed. A failure prints the reproducing ERIS_SEED
+#   command.
+
+on:
+  schedule:
+    - cron: '41 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  full-mutation:
+    name: Full-src mutation report
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_sqlite
+          coverage: pcov
+      - run: composer install --no-interaction --no-progress
+      # --with-uncovered: since 0.31 Infection reports only covered code by
+      # default, which would hide exactly the boundary code this run exists
+      # to watch.
+      - name: infection (full src, report only)
+        run: vendor/bin/infection --configuration=infection.full.json5 --threads=max --no-progress --with-uncovered
+      - name: Upload mutation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-report-${{ github.run_id }}
+          path: |
+            infection.log
+            infection-summary.log
+          retention-days: 90
+
+  deep-properties:
+    name: High-iteration property tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_sqlite
+          coverage: none
+      - run: composer install --no-interaction --no-progress
+      - name: pest (2000 iterations per property)
+        run: vendor/bin/pest
+        env:
+          DAN_PROPERTY_ITERATIONS: '2000'
