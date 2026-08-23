@@ -12,7 +12,7 @@ composer install -d lib         # shared lib
 composer install -d bundle      # probe bundle
 ```
 
-Requires PHP 8.2+, Composer, and Docker (for the database-backed tests and the e2e smoke run).
+Requires PHP 8.4+ for the harness (the probe bundle and lib keep an 8.2 floor, matching the DAL versions the probe runs inside), Composer, and Docker (for the database-backed tests and the e2e smoke run).
 
 ## The gate
 

@@ -1,0 +1,21 @@
+{
+    // Nightly full-src mutation report (not a gate): everything the harness
+    // ships, including the boundary classes the PR gate deliberately skips.
+    // The report exists to watch scope drift - code that grew logic without
+    // moving into the gated core.
+    "$schema": "vendor/infection/infection/resources/schema.json",
+    "source": {
+        "directories": [
+            "src"
+        ]
+    },
+    "testFramework": "phpunit",
+    "timeout": 10,
+    "logs": {
+        "text": "infection.log",
+        "summary": "infection-summary.log"
+    },
+    "mutators": {
+        "@default": true
+    }
+}

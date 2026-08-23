@@ -19,7 +19,7 @@ Generation *time* is explicitly out of scope — producing the SQL is never the 
 
 ## Usage
 
-Running DAN requires PHP 8.2 or newer, Composer, and Docker.
+Running DAN requires PHP 8.4 or newer, Composer, and Docker. (The probe bundle that DAN installs into each DAL runtime keeps a PHP 8.2 floor, matching the DAL versions it runs inside.)
 
 ```bash
 # A/B diff: local checkout (candidate) vs released baseline

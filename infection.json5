@@ -1,0 +1,30 @@
+{
+    // Mutation scope = the deterministic core whose correctness DAN's
+    // authority rests on (trust layer 1). Boundary classes that only
+    // orchestrate processes/containers are excluded: the e2e smoke and
+    // calibration workflows carry them (trust layers 3 and 4), so mutating
+    // them here would only measure noise. The nightly full-src report runs
+    // infection.full.json5 instead.
+    "$schema": "vendor/infection/infection/resources/schema.json",
+    "source": {
+        "directories": [
+            "src/Comparison",
+            "src/Measurement",
+            "src/Protocol",
+            "src/RunStore"
+        ],
+        "excludes": [
+            // Boundary: drives containers and probe processes per grid cell.
+            "Execution/GridCellMeasurer.php"
+        ]
+    },
+    "testFramework": "phpunit",
+    "timeout": 10,
+    "logs": {
+        "text": "infection.log",
+        "summary": "infection-summary.log"
+    },
+    "mutators": {
+        "@default": true
+    }
+}
