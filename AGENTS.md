@@ -71,7 +71,7 @@ Names describe DAN's domain concepts, never implementation mechanics.
 - **No namespace stutter:** `Gate\Policy`, not `Gate\GatePolicy`.
 - **Namespaces are organized by responsibility, not left flat.** When a namespace mixes abstraction levels (domain values next to orchestration next to infrastructure), split it into sub-namespaces along those lines. Established structure: `Implementation\{Reference,Identity,Runtime}`, `Measurement\{Scheduling,Result,Execution}`, `RunStore\{Artifact,Filesystem,Index}`, `Probe\Execution\{Command,Measurement,Result}`, `Probe\Recorder\Dbal`, `Probe\Seeding\{Command,Dataset,Progress}`, `Probe\Scenario\Corpus`. Avoid one-class namespaces; a sub-namespace must carry a cohesive responsibility.
 - **Established vocabulary — use it, don't reinvent it:**
-  - *baseline / candidate* — the two comparison roles. Never `a`/`b` in identifiers or values (filesystem slot dirs `a/`/`b/` are a persisted boundary exception).
+  - *baseline / candidate* — the two comparison roles. Never `a`/`b` in identifiers or values; the persisted slot directories are `baseline/` and `candidate/` too.
   - *implementation* — the DAL implementation under measurement; referenced by a `Reference`, identified by a content-hash `Identity`, executed as a `Runtime`.
   - *comparison* vs *gate* — comparing two runs is `Comparison` (`RunComparator::compare()` → `RunComparison`/`CellComparison`); pass/fail policy is `Gate` (`Policy`, `Violation`, `ViolationKind`). `diff` survives only as the user-facing CLI command name.
   - *corpus* — the built-in scenario set (`Probe\Scenario\Corpus`).

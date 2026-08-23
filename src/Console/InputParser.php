@@ -27,7 +27,7 @@ final class InputParser
             measuredIterations: $this->int(input: $input, name: 'iterations'),
             blocks: $this->int(input: $input, name: 'blocks'),
             scenarioFilter: $this->nullableString(input: $input, name: 'filter'),
-            outputDirectory: Path::fromString($this->string(input: $input, name: 'out')),
+            outputDirectory: $this->absolutePath($this->string(input: $input, name: 'out')),
             maxWallRegressionPct: $this->float(input: $input, name: 'max-regression'),
             failOnSqlChange: $this->bool(input: $input, name: 'fail-on-sql-change'),
         );
@@ -43,6 +43,27 @@ final class InputParser
             failOnSqlChange: $this->bool(input: $input, name: 'fail-on-sql-change'),
             allowProtocolMismatch: $this->bool(input: $input, name: 'allow-protocol-mismatch'),
         );
+    }
+
+    /**
+     * The run output directory crosses process boundaries: probe invocations
+     * run with the runtime as working directory, so a relative path would
+     * silently resolve somewhere else there.
+     */
+    private function absolutePath(string $value): Path
+    {
+        if (str_starts_with($value, \DIRECTORY_SEPARATOR)) {
+            return Path::fromString($value);
+        }
+        if (str_starts_with($value, '.' . \DIRECTORY_SEPARATOR)) {
+            $value = substr($value, 2);
+        }
+        $cwd = getcwd();
+        if ($cwd === false) {
+            throw new InvalidArgumentException(sprintf('Cannot resolve the relative path "%s": the current working directory is unavailable.', $value));
+        }
+
+        return Path::fromString($cwd)->join($value);
     }
 
     /**
