@@ -38,7 +38,10 @@ services:
     # Shopware's EntityCompilerPass creates dan_synthetic_blob.repository from
     # the autoconfigured definition using that runtime's repository signature.
     Dan\Probe\Synthetic\SyntheticBlobDefinition: ~
-    Dan\Probe\Synthetic\SyntheticSchemaInstaller: ~
+    # Public like QueryRecorder: the kernel tests fetch it from the container,
+    # and the compiled container would otherwise inline it into DatasetSeeder.
+    Dan\Probe\Synthetic\SyntheticSchemaInstaller:
+        public: true
 
     # In-app measurement agent. #[AsCommand] supplies the console.command tag.
     Dan\Probe\Execution\Command\ExecuteScenariosCommand: ~
