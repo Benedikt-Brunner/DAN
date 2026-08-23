@@ -64,3 +64,11 @@ $_ENV['APP_URL'] ??= 'http://localhost:8000';
     ->setPlatformEmbedded(false)
     ->setForceInstall(false)
     ->bootstrap();
+
+// From here on, every kernel the tests boot must record on its kernel
+// connection - the same wiring bin/dan-console applies in a measured runtime.
+// Booting with reuseConnection: false makes KernelLifecycleManager pull the
+// connection from Kernel::getConnection(), which serves the armed one.
+Dan\Probe\Tests\RecordingKernel::armRecording();
+Shopware\Core\Framework\Test\TestCaseBase\KernelLifecycleManager::ensureKernelShutdown();
+Shopware\Core\Framework\Test\TestCaseBase\KernelLifecycleManager::bootKernel(reuseConnection: false);
