@@ -1,0 +1,69 @@
+{
+    "name": "dan/harness",
+    "description": "DAL ANalyzer - repeatable, isolated profiling of the SQL produced by Shopware's DAL.",
+    "license": "proprietary",
+    "type": "project",
+    "require": {
+        "dan/lib": "^1.0",
+        "php": ">=8.2",
+        "ext-pdo_sqlite": "*",
+        "markrogoyski/math-php": "^2.13",
+        "symfony/console": "^7.0",
+        "symfony/filesystem": "^7.0",
+        "symfony/process": "^7.0"
+    },
+    "require-dev": {
+        "friendsofphp/php-cs-fixer": "^3",
+        "phpstan/phpstan": "^2",
+        "phpstan/phpstan-deprecation-rules": "^2",
+        "phpunit/phpunit": "^11.0",
+        "shipmonk/dead-code-detector": "^1.3",
+        "squizlabs/php_codesniffer": "^3"
+    },
+    "autoload": {
+        "psr-4": {
+            "Dan\\Harness\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Dan\\Harness\\Dev\\": "dev/",
+            "Dan\\Harness\\Tests\\": "tests/"
+        },
+        "classmap": [
+            "tests/PhpStan/Fixtures/"
+        ]
+    },
+    "bin": [
+        "bin/dan"
+    ],
+    "repositories": [
+        {
+            "type": "path",
+            "url": "lib",
+            "options": {
+                "symlink": true
+            }
+        }
+    ],
+    "config": {
+        "sort-packages": true
+    },
+    "scripts": {
+        "check": [
+            "@lint",
+            "@phpstan",
+            "@test"
+        ],
+        "lint": [
+            "php-cs-fixer fix --dry-run --diff",
+            "phpcs"
+        ],
+        "lint:fix": [
+            "phpcbf --no-colors || true",
+            "php-cs-fixer fix"
+        ],
+        "phpstan": "phpstan analyse",
+        "test": "phpunit"
+    }
+}
