@@ -6,6 +6,7 @@ namespace Dan\Harness\Console;
 
 use Dan\Harness\Console\Diff\DiffOptions;
 use Dan\Harness\Console\Run\RunOptions;
+use Dan\Lib\Filesystem\AbsolutePath;
 use Dan\Lib\Filesystem\Path;
 use InvalidArgumentException;
 use Symfony\Component\Console\Input\InputInterface;
@@ -50,20 +51,14 @@ final class InputParser
      * run with the runtime as working directory, so a relative path would
      * silently resolve somewhere else there.
      */
-    private function absolutePath(string $value): Path
+    private function absolutePath(string $value): AbsolutePath
     {
-        if (str_starts_with($value, \DIRECTORY_SEPARATOR)) {
-            return Path::fromString($value);
-        }
-        if (str_starts_with($value, '.' . \DIRECTORY_SEPARATOR)) {
-            $value = substr($value, 2);
-        }
         $cwd = getcwd();
         if ($cwd === false) {
             throw new InvalidArgumentException(sprintf('Cannot resolve the relative path "%s": the current working directory is unavailable.', $value));
         }
 
-        return Path::fromString($cwd)->join($value);
+        return AbsolutePath::resolve(value: $value, workingDirectory: $cwd);
     }
 
     /**

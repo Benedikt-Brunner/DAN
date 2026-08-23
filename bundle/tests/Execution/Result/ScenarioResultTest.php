@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Dan\Probe\Tests\Execution\Result;
 
-use Dan\Lib\Filesystem\Path;
+use Dan\Lib\Filesystem\AbsolutePath;
 use Dan\Probe\Execution\Result\ScenarioResult;
 use Dan\Probe\Execution\Result\ScenarioResultWriter;
 use Dan\Probe\Execution\Result\StatementResult;
@@ -75,7 +75,7 @@ final class ScenarioResultTest extends TestCase
 
         try {
             (new ScenarioResultWriter())->write(
-                outputDirectory: Path::fromString($directory),
+                outputDirectory: AbsolutePath::fromString($directory),
                 result: $result,
             );
 
@@ -111,7 +111,7 @@ final class ScenarioResultTest extends TestCase
         $this->expectExceptionMessage('Could not write the scenario result for "product.deep-read"');
 
         (new ScenarioResultWriter())->write(
-            outputDirectory: Path::fromString($missingDirectory),
+            outputDirectory: AbsolutePath::fromString($missingDirectory),
             result: $result,
         );
     }

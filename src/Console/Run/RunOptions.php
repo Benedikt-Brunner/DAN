@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Dan\Harness\Console\Run;
 
-use Dan\Lib\Filesystem\Path;
+use Dan\Lib\Filesystem\AbsolutePath;
 
 /**
  * Typed view of one `dan run` invocation's CLI input. Produced by
@@ -26,7 +26,7 @@ final class RunOptions
         public readonly int $measuredIterations,
         public readonly int $blocks,
         public readonly ?string $scenarioFilter,
-        public readonly Path $outputDirectory,
+        public readonly AbsolutePath $outputDirectory,
         public readonly float $maxWallRegressionPct,
         public readonly bool $failOnSqlChange,
     ) {}
