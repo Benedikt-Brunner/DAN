@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Dan\Harness\Tests\Process;
 
+use Dan\Harness\Process\OutputListener;
 use Dan\Harness\Process\ProcessCommand;
 use Dan\Harness\Process\SymfonyProcessRunner;
 use Dan\Lib\Filesystem\Path;
@@ -45,6 +46,34 @@ final class SymfonyProcessRunnerTest extends TestCase
         ));
 
         self::assertSame('SELECT ONE', file_get_contents($outputPath->toString()));
+    }
+
+    public function testAppliesTheWorkingDirectoryAndStreamsAllOutputToTheListener(): void
+    {
+        $listener = new class implements OutputListener {
+            public string $received = '';
+
+            public function onOutput(string $data): void
+            {
+                $this->received .= $data;
+            }
+        };
+
+        (new SymfonyProcessRunner())->mustRun(
+            command: new ProcessCommand(
+                arguments: [
+                    \PHP_BINARY,
+                    '-r',
+                    'fwrite(STDOUT, getcwd()); fwrite(STDERR, "#stderr#");',
+                ],
+                timeout: null,
+                workingDirectory: Path::fromString($this->workDirectory),
+            ),
+            outputListener: $listener,
+        );
+
+        self::assertStringContainsString((string) realpath($this->workDirectory), $listener->received);
+        self::assertStringContainsString('#stderr#', $listener->received);
     }
 
     public function testRunReportsAnUnsuccessfulExit(): void

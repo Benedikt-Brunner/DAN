@@ -17,5 +17,6 @@ final class ProcessCommand
         public readonly ?Duration $timeout,
         public readonly ?Path $inputPath = null,
         public readonly ?Path $outputPath = null,
+        public readonly ?Path $workingDirectory = null,
     ) {}
 }
