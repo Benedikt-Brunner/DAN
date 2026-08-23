@@ -1,0 +1,34 @@
+{
+    "schemaVersion": 1,
+    "scenario": "product.deep-read",
+    "entity": "product",
+    "dalVersion": "v6.6.10.22",
+    "iterations": 3,
+    "wallNsSamples": [
+        1250000,
+        1190000,
+        1210000
+    ],
+    "statements": [
+        {
+            "index": 0,
+            "sql": "SELECT `product`.`id` FROM `product` WHERE `product`.`id` IN (?, ?, ?)",
+            "durationsNsSamples": [
+                420000,
+                395000,
+                402000
+            ],
+            "divergent": false
+        },
+        {
+            "index": 1,
+            "sql": "SELECT `category`.`id`, `category`.`name` FROM `category` WHERE `category`.`id` = ?",
+            "durationsNsSamples": [
+                310000,
+                305000,
+                322000
+            ],
+            "divergent": true
+        }
+    ]
+}
