@@ -7,6 +7,7 @@ namespace Dan\Harness\Tests\Database;
 use Dan\Harness\Database\DatabaseInstance;
 use Dan\Harness\Database\DatabaseManager;
 use Dan\Harness\Database\DockerDatabaseManager;
+use Dan\Harness\Process\OutputListener;
 use Dan\Harness\Process\ProcessCommand;
 use Dan\Harness\Process\ProcessRunner;
 use Dan\Harness\Protocol\DatabaseTarget;
@@ -34,7 +35,7 @@ final class DockerDatabaseManagerTest extends TestCase
                 return true;
             }
 
-            public function mustRun(ProcessCommand $command): void
+            public function mustRun(ProcessCommand $command, ?OutputListener $outputListener = null): void
             {
                 $this->commands[] = $command;
             }
