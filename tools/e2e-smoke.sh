@@ -5,7 +5,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-DAL_VERSION="${DAL_VERSION:-v6.6.10.0}"
+DAL_VERSION="${DAL_VERSION:-v6.6.10.22}"
 OUT_DIR="runs"
 
 bin/dan run \
