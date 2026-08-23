@@ -21,6 +21,7 @@ use Dan\Harness\Report\MarkdownReportRenderer;
 use Dan\Harness\RunStore\Artifact\RunManifest;
 use Dan\Harness\RunStore\Filesystem\RunDirectory;
 use Dan\Harness\RunStore\Index\SqliteIndexer;
+use Dan\Lib\Filesystem\AbsolutePath;
 use Dan\Lib\Filesystem\Path;
 use DateTimeImmutable;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -79,7 +80,7 @@ final class RunCommand extends Command
         $sessionDir = $outRoot->join(sprintf('%s-%s', date('Ymd-His'), substr(bin2hex(random_bytes(3)), 0, 6)));
 
         $identityResolver = new IdentityResolver();
-        $runtimeFactory = new RuntimeFactory(runtimesDirectory: $outRoot->join('.dan-runtimes'), probeBundlePath: Path::fromString(dirname(__DIR__, 3))->join('bundle'));
+        $runtimeFactory = new RuntimeFactory(runtimesDirectory: $outRoot->join('.dan-runtimes')->toPath(), probeBundlePath: Path::fromString(dirname(__DIR__, 3))->join('bundle'));
 
         $slots = [
             RunSlot::Baseline,
@@ -92,7 +93,7 @@ final class RunCommand extends Command
             $reference = Reference::fromString($spec);
             $identity = $identityResolver->resolve($reference);
 
-            $directory = new RunDirectory($sessionDir->join($slot->value));
+            $directory = new RunDirectory($sessionDir->join($slot->value)->toPath());
             $directory->initialize(new RunManifest(
                 runId: $sessionDir->basename() . '-' . $slot->value,
                 createdAt: new DateTimeImmutable(),
@@ -113,7 +114,7 @@ final class RunCommand extends Command
 
         $measurer = new GridCellMeasurer(
             databaseManager: new DockerDatabaseManager(),
-            cache: new SnapshotCache($outRoot->join('.dan-cache', 'snapshots')),
+            cache: new SnapshotCache($outRoot->join('.dan-cache', 'snapshots')->toPath()),
             scheduler: new BlockScheduler(),
             output: $output,
         );
@@ -151,7 +152,7 @@ final class RunCommand extends Command
     private function compareAndReport(
         RunDirectory $baseline,
         RunDirectory $candidate,
-        Path $sessionDir,
+        AbsolutePath $sessionDir,
         Policy $policy,
         OutputInterface $output,
     ): int {
