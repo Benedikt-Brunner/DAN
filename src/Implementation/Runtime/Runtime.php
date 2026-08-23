@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace Dan\Harness\Implementation\Runtime;
 
 use Dan\Harness\Database\DatabaseInstance;
+use Dan\Harness\Process\OutputListener;
+use Dan\Harness\Process\ProcessCommand;
+use Dan\Harness\Process\ProcessRunner;
 use Dan\Lib\Filesystem\Path;
-use Symfony\Component\Console\Output\OutputInterface;
-use Symfony\Component\Process\Process;
 
 /**
  * Executable runtime for a DAL implementation.
@@ -17,9 +18,16 @@ use Symfony\Component\Process\Process;
  */
 final class Runtime
 {
+    /**
+     * The probe's console entry, staged next to the skeleton's bin/console by
+     * the runtime factory.
+     */
+    private const DAN_CONSOLE_ENTRY = 'bin/dan-console';
+
     public function __construct(
         private readonly Path $workingDirectory,
-        private readonly OutputInterface $output,
+        private readonly ProcessRunner $processRunner,
+        private readonly ?OutputListener $outputListener = null,
     ) {}
 
     /**
@@ -30,37 +38,7 @@ final class Runtime
      */
     public function run(array $args, DatabaseInstance $database): void
     {
-        $this->console(entry: 'bin/dan-console', args: $args, database: $database);
-    }
-
-    /**
-     * @param list<string> $args
-     */
-    private function console(string $entry, array $args, DatabaseInstance $database): void
-    {
-        $process = new Process(
-            [
-                'php',
-                '-d',
-                'memory_limit=-1',
-                $entry,
-                ...$args,
-            ],
-            $this->workingDirectory->toString(),
-            [
-                'DATABASE_URL' => $database->databaseUrl(),
-                'APP_ENV' => 'prod',
-                'APP_SECRET' => 'dan-not-a-secret',
-                'APP_URL' => 'http://localhost:8000',
-                'SHOPWARE_SKIP_WEBINSTALLER' => '1',
-            ],
-            timeout: null,
-        );
-        $process->mustRun(function (string $type, string $buffer): void {
-            if ($this->output->isVerbose()) {
-                $this->output->write($buffer);
-            }
-        });
+        $this->console(entry: self::DAN_CONSOLE_ENTRY, args: $args, database: $database);
     }
 
     public function installShopware(DatabaseInstance $database): void
@@ -76,5 +54,33 @@ final class Runtime
             '--force',
             '--no-interaction',
         ], database: $database);
+    }
+
+    /**
+     * @param list<string> $args
+     */
+    private function console(string $entry, array $args, DatabaseInstance $database): void
+    {
+        $this->processRunner->mustRun(
+            command: new ProcessCommand(
+                arguments: [
+                    'php',
+                    '-d',
+                    'memory_limit=-1',
+                    $entry,
+                    ...$args,
+                ],
+                timeout: null,
+                workingDirectory: $this->workingDirectory,
+                environment: [
+                    'DATABASE_URL' => $database->databaseUrl(),
+                    'APP_ENV' => 'prod',
+                    'APP_SECRET' => 'dan-not-a-secret',
+                    'APP_URL' => 'http://localhost:8000',
+                    'SHOPWARE_SKIP_WEBINSTALLER' => '1',
+                ],
+            ),
+            outputListener: $this->outputListener,
+        );
     }
 }

@@ -11,6 +11,7 @@ final class ProcessCommand
 {
     /**
      * @param non-empty-list<string> $arguments
+     * @param array<string, string> $environment merged over the inherited environment
      */
     public function __construct(
         public readonly array $arguments,
@@ -18,5 +19,6 @@ final class ProcessCommand
         public readonly ?Path $inputPath = null,
         public readonly ?Path $outputPath = null,
         public readonly ?Path $workingDirectory = null,
+        public readonly array $environment = [],
     ) {}
 }

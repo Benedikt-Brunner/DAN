@@ -50,7 +50,7 @@ final class RuntimeFactory
             // script is a copy and must follow probe updates.
             $this->stageDanConsole($workingDirectory);
 
-            return new Runtime(workingDirectory: $workingDirectory, output: $output);
+            return $this->createRuntime(workingDirectory: $workingDirectory, output: $output);
         }
 
         $output->writeln(sprintf('  Building DAL runtime for <info>%s</info> at %s', $identity->label, $workingDirectory->toString()));
@@ -135,7 +135,16 @@ final class RuntimeFactory
 
         touch($workingDirectory->join('.dan-runtime')->toString());
 
-        return new Runtime(workingDirectory: $workingDirectory, output: $output);
+        return $this->createRuntime(workingDirectory: $workingDirectory, output: $output);
+    }
+
+    private function createRuntime(Path $workingDirectory, OutputInterface $output): Runtime
+    {
+        return new Runtime(
+            workingDirectory: $workingDirectory,
+            processRunner: $this->processRunner,
+            outputListener: new VerboseProcessOutputListener($output),
+        );
     }
 
     private function registerProbeBundle(Path $workingDirectory): void

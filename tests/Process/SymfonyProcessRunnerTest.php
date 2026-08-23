@@ -76,6 +76,24 @@ final class SymfonyProcessRunnerTest extends TestCase
         self::assertStringContainsString('#stderr#', $listener->received);
     }
 
+    public function testAppliesTheEnvironmentOnTopOfTheInheritedOne(): void
+    {
+        $outputPath = Path::fromString($this->workDirectory . '/env-output');
+
+        (new SymfonyProcessRunner())->mustRun(new ProcessCommand(
+            arguments: [
+                \PHP_BINARY,
+                '-r',
+                'fwrite(STDOUT, getenv("DAN_TEST_ENVIRONMENT") . "|" . (getenv("PATH") !== false ? "inherited" : "lost"));',
+            ],
+            timeout: null,
+            outputPath: $outputPath,
+            environment: ['DAN_TEST_ENVIRONMENT' => 'dan-value'],
+        ));
+
+        self::assertSame('dan-value|inherited', file_get_contents($outputPath->toString()));
+    }
+
     public function testRunReportsAnUnsuccessfulExit(): void
     {
         $command = new ProcessCommand(

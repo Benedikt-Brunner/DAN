@@ -26,7 +26,11 @@ final class SymfonyProcessRunner implements ProcessRunner
         try {
             $input = $this->openInput($command);
             $output = $this->openOutput($command);
-            $process = new Process($command->arguments, $command->workingDirectory?->toString());
+            $process = new Process(
+                $command->arguments,
+                $command->workingDirectory?->toString(),
+                $command->environment === [] ? null : $command->environment,
+            );
             $process->setTimeout($command->timeout?->toSecondsFloat());
             if ($input !== null) {
                 $process->setInput($input);
