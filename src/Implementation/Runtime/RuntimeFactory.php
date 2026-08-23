@@ -8,12 +8,12 @@ use Dan\Harness\Console\VerboseProcessOutputListener;
 use Dan\Harness\Implementation\Identity\Identity;
 use Dan\Harness\Implementation\Reference\Reference;
 use Dan\Harness\Implementation\Reference\ReferenceType;
+use Dan\Harness\Process\ProcessCommand;
 use Dan\Harness\Process\ProcessRunner;
 use Dan\Harness\Process\SymfonyProcessRunner;
 use Dan\Lib\Filesystem\Path;
 use RuntimeException;
 use Symfony\Component\Console\Output\OutputInterface;
-use Symfony\Component\Process\Process;
 
 /**
  * Builds an executable runtime for a DAL implementation and wires the DAN
@@ -163,14 +163,16 @@ final class RuntimeFactory
      */
     private function composer(array $args, Path $cwd, OutputInterface $output): void
     {
-        $process = new Process([
-            'composer',
-            ...$args,
-        ], $cwd->toString(), timeout: null);
-        $process->mustRun(function (string $type, string $buffer) use ($output): void {
-            if ($output->isVerbose()) {
-                $output->write($buffer);
-            }
-        });
+        $this->processRunner->mustRun(
+            command: new ProcessCommand(
+                arguments: [
+                    'composer',
+                    ...$args,
+                ],
+                timeout: null,
+                workingDirectory: $cwd,
+            ),
+            outputListener: new VerboseProcessOutputListener($output),
+        );
     }
 }
