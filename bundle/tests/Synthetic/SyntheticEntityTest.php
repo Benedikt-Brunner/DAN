@@ -78,7 +78,7 @@ final class SyntheticEntityTest extends TestCase
             $result = $repository->search((new SyntheticJsonPathScenario())->criteria($context), $context);
             $statements = $recorder->drain();
 
-            self::assertSame([$matchingId], $result->getIds());
+            self::assertSame([$matchingId], array_values($result->getIds()));
             self::assertNotSame([], array_values(array_filter(
                 $statements,
                 fn ($statement): bool => str_contains($statement->sql, 'JSON_EXTRACT'),
