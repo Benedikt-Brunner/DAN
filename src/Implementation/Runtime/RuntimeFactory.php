@@ -14,6 +14,7 @@ use Dan\Harness\Process\SymfonyProcessRunner;
 use Dan\Lib\Filesystem\Path;
 use RuntimeException;
 use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Filesystem\Filesystem;
 
 /**
  * Builds an executable runtime for a DAL implementation and wires the DAN
@@ -45,6 +46,9 @@ final class RuntimeFactory
 
         if (file_exists($workingDirectory->join('.dan-runtime')->toString())) {
             $output->writeln(sprintf('  Reusing DAL runtime for <info>%s</info> at %s', $identity->label, $workingDirectory->toString()));
+            // Re-stage on reuse: the probe is symlinked, but this entry
+            // script is a copy and must follow probe updates.
+            $this->stageDanConsole($workingDirectory);
 
             return new Runtime(workingDirectory: $workingDirectory, output: $output);
         }
@@ -118,6 +122,7 @@ final class RuntimeFactory
         ], cwd: $workingDirectory, output: $output);
 
         $this->registerProbeBundle($workingDirectory);
+        $this->stageDanConsole($workingDirectory);
 
         // The skeleton needs an APP_SECRET and related runtime settings;
         // DATABASE_URL is injected separately for each measurement cell.
@@ -147,6 +152,26 @@ final class RuntimeFactory
         }
         $registration = "    Dan\\Probe\\DanProbeBundle::class => ['all' => true],\n];";
         file_put_contents($bundlesFile->toString(), str_replace('];', $registration, $contents));
+    }
+
+    /**
+     * Stages the probe's console entry next to the skeleton's bin/console.
+     * It boots the kernel with the recording middleware on the kernel
+     * connection; probe commands run through it (see Runtime::run()).
+     */
+    private function stageDanConsole(Path $workingDirectory): void
+    {
+        $source = $this->probeBundlePath->join('src', 'Resources', 'skeleton', 'dan-console');
+        $target = $workingDirectory->join('bin', 'dan-console');
+        if (!copy($source->toString(), $target->toString())) {
+            throw new RuntimeException(sprintf('Could not stage the probe console entry from "%s" to "%s".', $source->toString(), $target->toString()));
+        }
+        chmod($target->toString(), 0o755);
+
+        // The probe's service wiring does not influence Shopware's container
+        // cache hash, so a reused runtime would keep serving a container
+        // compiled from an older probe. Staging drops the compiled state.
+        (new Filesystem())->remove($workingDirectory->join('var', 'cache')->toString());
     }
 
     /**

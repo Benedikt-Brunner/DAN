@@ -7,6 +7,7 @@ namespace Dan\Probe\Execution\Command;
 use Dan\Lib\Filesystem\AbsolutePath;
 use Dan\Probe\Execution\Measurement\ScenarioMeasurer;
 use Dan\Probe\Execution\Result\ScenarioResultWriter;
+use Dan\Probe\Recorder\RecordingBootstrap;
 use Dan\Probe\Scenario\ScenarioRegistry;
 use InvalidArgumentException;
 use Shopware\Core\Framework\Context;
@@ -49,6 +50,12 @@ final class ExecuteScenariosCommand extends Command
 
             return Command::INVALID;
         }
+        if (!RecordingBootstrap::armed()) {
+            $output->writeln('<error>dan:execute must boot through bin/dan-console so the kernel connection records - plain bin/console would silently measure nothing.</error>');
+
+            return Command::FAILURE;
+        }
+
         // A relative path would resolve against the runtime's working
         // directory instead of the harness's - reject it at the boundary.
         $outputDirectory = AbsolutePath::fromString($outputDir);

@@ -21,17 +21,12 @@ services:
             - { name: dan.scenario }
 
     Dan\Probe\Seeding\Dataset\DatasetSeeder: ~
+    # The single recorder instance shared with the recording middleware that
+    # bin/dan-console attaches to the kernel connection before the container
+    # exists (RecordingBootstrap).
     Dan\Probe\Recorder\QueryRecorder:
         public: true
-    Dan\Probe\Recorder\Dbal\RecordingMiddleware: ~
-    Dan\Probe\Recorder\Dbal\RecordingConnectionFactory: ~
-    dan.probe.recording_connection:
-        class: Doctrine\DBAL\Connection
-        decorates: Doctrine\DBAL\Connection
-        factory: ['@Dan\Probe\Recorder\Dbal\RecordingConnectionFactory', create]
-        arguments:
-            $connection: '@dan.probe.recording_connection.inner'
-            $middleware: '@Dan\Probe\Recorder\Dbal\RecordingMiddleware'
+        factory: ['Dan\Probe\Recorder\RecordingBootstrap', 'recorder']
     Dan\Probe\Execution\Measurement\ScenarioMeasurer: ~
     Dan\Probe\Execution\Result\ScenarioResultWriter: ~
 

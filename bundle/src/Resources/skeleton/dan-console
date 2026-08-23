@@ -1,0 +1,66 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+/*
+ * DAN's console entry for the DAL runtime under measurement.
+ *
+ * Staged next to bin/console by the harness runtime factory. Boots the same
+ * kernel as bin/console with one difference: the kernel connection is built
+ * with the probe's recording middleware, injected through Shopware's own
+ * seam for connection middlewares (KernelFactory::create()'s $connection
+ * parameter - the same way Shopware injects its profiler middleware). One
+ * connection, one session: the kernel applies its session variables to the
+ * very connection that is measured, so nothing needs to be mirrored.
+ */
+
+use Dan\Probe\Recorder\RecordingBootstrap;
+use Shopware\Core\Framework\Adapter\Database\MySQLFactory;
+use Shopware\Core\Framework\Adapter\Kernel\KernelFactory;
+use Shopware\Core\Framework\Plugin\KernelPluginLoader\DbalKernelPluginLoader;
+use Shopware\Core\Framework\Plugin\KernelPluginLoader\StaticKernelPluginLoader;
+use Symfony\Bundle\FrameworkBundle\Console\Application;
+use Symfony\Component\Console\Input\ArgvInput;
+
+if (!file_exists(__DIR__ . '/../.env') && !file_exists(__DIR__ . '/../.env.dist') && !file_exists(__DIR__ . '/../.env.local.php')) {
+    $_SERVER['APP_RUNTIME_OPTIONS']['disable_dotenv'] = true;
+}
+
+require_once __DIR__ . '/../vendor/autoload_runtime.php';
+
+return function (array &$context) {
+    set_time_limit(0);
+
+    $classLoader = require __DIR__ . '/../vendor/autoload.php';
+
+    if (!isset($context['PROJECT_ROOT'])) {
+        $context['PROJECT_ROOT'] = dirname(__DIR__);
+    }
+
+    $input = new ArgvInput();
+    $env = $input->getParameterOption(['--env', '-e'], $context['APP_ENV'] ?? 'prod', true);
+    $debug = ($context['APP_DEBUG'] ?? ($env !== 'prod')) && !$input->hasParameterOption('--no-debug', true);
+
+    $connection = MySQLFactory::create([RecordingBootstrap::middleware()]);
+
+    $pluginLoader = trim($context['DATABASE_URL'] ?? '') !== ''
+        ? new DbalKernelPluginLoader($classLoader, null, $connection)
+        : new StaticKernelPluginLoader($classLoader, null);
+
+    $kernel = KernelFactory::create(
+        environment: $env,
+        debug: $debug,
+        classLoader: $classLoader,
+        pluginLoader: $pluginLoader,
+        connection: $connection,
+    );
+
+    $application = new Application($kernel);
+    $kernel->boot();
+
+    $application->setName('DAN probe');
+    $application->setVersion($kernel->getContainer()->getParameter('kernel.shopware_version'));
+
+    return $application;
+};
