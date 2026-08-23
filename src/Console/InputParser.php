@@ -6,6 +6,7 @@ namespace Dan\Harness\Console;
 
 use Dan\Harness\Console\Diff\DiffOptions;
 use Dan\Harness\Console\Run\RunOptions;
+use Dan\Lib\Filesystem\AbsolutePath;
 use Dan\Lib\Filesystem\Path;
 use InvalidArgumentException;
 use Symfony\Component\Console\Input\InputInterface;
@@ -27,7 +28,7 @@ final class InputParser
             measuredIterations: $this->int(input: $input, name: 'iterations'),
             blocks: $this->int(input: $input, name: 'blocks'),
             scenarioFilter: $this->nullableString(input: $input, name: 'filter'),
-            outputDirectory: Path::fromString($this->string(input: $input, name: 'out')),
+            outputDirectory: $this->absolutePath($this->string(input: $input, name: 'out')),
             maxWallRegressionPct: $this->float(input: $input, name: 'max-regression'),
             failOnSqlChange: $this->bool(input: $input, name: 'fail-on-sql-change'),
         );
@@ -43,6 +44,21 @@ final class InputParser
             failOnSqlChange: $this->bool(input: $input, name: 'fail-on-sql-change'),
             allowProtocolMismatch: $this->bool(input: $input, name: 'allow-protocol-mismatch'),
         );
+    }
+
+    /**
+     * The run output directory crosses process boundaries: probe invocations
+     * run with the runtime as working directory, so a relative path would
+     * silently resolve somewhere else there.
+     */
+    private function absolutePath(string $value): AbsolutePath
+    {
+        $cwd = getcwd();
+        if ($cwd === false) {
+            throw new InvalidArgumentException(sprintf('Cannot resolve the relative path "%s": the current working directory is unavailable.', $value));
+        }
+
+        return AbsolutePath::resolve(value: $value, workingDirectory: $cwd);
     }
 
     /**

@@ -15,7 +15,7 @@ on:
   workflow_dispatch:
 
 env:
-  DAL_BASELINE: 'v6.6.10.0'
+  DAL_BASELINE: 'v6.6.10.22'
 
 jobs:
   a-a:

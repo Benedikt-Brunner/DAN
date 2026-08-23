@@ -5,7 +5,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-DAL_VERSION="${DAL_VERSION:-v6.6.10.0}"
+DAL_VERSION="${DAL_VERSION:-v6.6.10.22}"
 OUT_DIR="runs"
 
 bin/dan run \
@@ -20,14 +20,14 @@ bin/dan run \
 session="$(ls -td "$OUT_DIR"/*/ | head -1)"
 echo "Session: $session"
 
-for expected in a/manifest.json b/manifest.json a/index.sqlite b/index.sqlite report.md; do
+for expected in baseline/manifest.json candidate/manifest.json baseline/index.sqlite candidate/index.sqlite report.md; do
     if [ ! -e "$session/$expected" ]; then
         echo "MISSING ARTIFACT: $session/$expected" >&2
         exit 1
     fi
 done
 
-cell_count="$(ls "$session"/a/cells/*.json 2>/dev/null | wc -l)"
+cell_count="$(ls "$session"/baseline/cells/*.json 2>/dev/null | wc -l)"
 if [ "$cell_count" -lt 1 ]; then
     echo "No cell results were recorded." >&2
     exit 1

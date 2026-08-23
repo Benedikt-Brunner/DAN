@@ -34,7 +34,7 @@ bin/dan run \
 bin/dan run --dal ../shopware --db mysql:8.0 --tier S
 
 # Diff two stored profiles (SQL/structure only — cross-session latency is not gated)
-bin/dan diff runs/<session>/a runs/<session>/b --out report.md
+bin/dan diff runs/<session>/baseline runs/<session>/candidate --out report.md
 ```
 
 A/B runs write `runs/<session>/report.md` (PR-comment-ready markdown) and exit non-zero on gate violations (`--max-regression`, default 15%; `--fail-on-sql-change` opt-in).
