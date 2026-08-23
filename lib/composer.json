@@ -1,0 +1,18 @@
+{
+    "name": "dan/lib",
+    "version": "1.0.0",
+    "description": "Framework-independent contracts and utilities shared by DAN's orchestrator and probe bundle.",
+    "license": "proprietary",
+    "type": "library",
+    "require": {
+        "php": ">=8.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "Dan\\Lib\\": "src/"
+        }
+    },
+    "config": {
+        "sort-packages": true
+    }
+}
