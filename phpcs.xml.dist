@@ -1,0 +1,51 @@
+<?xml version="1.0"?>
+<ruleset name="DAN"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/squizlabs/PHP_CodeSniffer/master/phpcs.xsd">
+    <description>DAN coding standard: PSR-12 base plus project-specific rules. Deliberately self-contained.</description>
+
+    <file>src</file>
+    <file>lib/src</file>
+    <file>bundle/src</file>
+    <file>dev</file>
+    <file>tests</file>
+    <file>bundle/tests</file>
+
+    <!-- PHPStan rule-test fixtures deliberately contain rule violations. -->
+    <exclude-pattern>tests/PhpStan/Fixtures/*</exclude-pattern>
+
+    <arg name="extensions" value="php"/>
+    <arg name="colors"/>
+    <arg value="p"/>
+
+    <!-- Base standard -->
+    <rule ref="PSR12">
+        <!-- Formatting is php-cs-fixer's job; phpcs only enforces what the fixer cannot. -->
+        <exclude name="Generic.Files.LineLength"/>
+        <exclude name="PSR12.Files.FileHeader.SpacingAfterBlock"/>
+        <exclude name="Squiz.Functions.MultiLineFunctionDeclaration.BraceOnSameLine"/>
+        <exclude name="Squiz.WhiteSpace.ScopeClosingBrace.ContentBefore"/>
+    </rule>
+
+    <!-- Project-specific rules -->
+    <rule ref="./dev/PhpCs/Sniffs/Arrays/MultiElementArraySniff.php"/>
+    <rule ref="./dev/PhpCs/Sniffs/Functions/NoStaticClosureSniff.php"/>
+    <rule ref="Generic.PHP.RequireStrictTypes"/>
+    <rule ref="Generic.CodeAnalysis.EmptyStatement"/>
+    <rule ref="Generic.CodeAnalysis.UnconditionalIfStatement"/>
+    <rule ref="Squiz.PHP.NonExecutableCode"/>
+    <rule ref="Generic.PHP.DeprecatedFunctions"/>
+    <rule ref="Generic.PHP.ForbiddenFunctions">
+        <properties>
+            <!-- var_dump/print_r leak into recorded artifacts; sleep skews latency samples. -->
+            <property name="forbiddenFunctions" type="array">
+                <element key="var_dump" value="null"/>
+                <element key="print_r" value="null"/>
+                <element key="sleep" value="null"/>
+                <element key="usleep" value="null"/>
+            </property>
+        </properties>
+        <!-- The database readiness probe legitimately polls. -->
+        <exclude-pattern>src/Database/DockerDatabaseManager.php</exclude-pattern>
+    </rule>
+</ruleset>

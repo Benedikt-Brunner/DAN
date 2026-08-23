@@ -1,0 +1,24 @@
+# DAN static analysis - deliberately self-contained, no shared base config.
+# The probe bundle has its own phpstan.neon.dist (it needs shopware/core
+# to be analyzable): see bundle/phpstan.neon.dist.
+includes:
+    - vendor/shipmonk/dead-code-detector/rules.neon
+    - vendor/phpstan/phpstan-deprecation-rules/rules.neon
+
+parameters:
+    level: max
+    treatPhpDocTypesAsCertain: false
+    scanDirectories:
+        - vendor/squizlabs/php_codesniffer/src
+    paths:
+        - src
+        - lib/src
+        - tests
+        - bin/dan
+        - dev
+    excludePaths:
+        # Deliberately violates the named-arguments rule it tests.
+        - tests/PhpStan/Fixtures
+
+rules:
+    - Dan\Harness\Dev\PhpStan\RequireNamedArgumentsRule
