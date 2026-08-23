@@ -79,7 +79,7 @@ final class RunCommand extends Command
         $sessionDir = $outRoot->join(sprintf('%s-%s', date('Ymd-His'), substr(bin2hex(random_bytes(3)), 0, 6)));
 
         $identityResolver = new IdentityResolver();
-        $runtimeFactory = new RuntimeFactory(runtimesDirectory: $outRoot->join('.dan-runtimes'), probeBundlePath: Path::fromString(dirname(__DIR__, 2))->join('bundle'));
+        $runtimeFactory = new RuntimeFactory(runtimesDirectory: $outRoot->join('.dan-runtimes'), probeBundlePath: Path::fromString(dirname(__DIR__, 3))->join('bundle'));
 
         $slots = [
             RunSlot::Baseline,
