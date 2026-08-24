@@ -22,17 +22,22 @@ use SplFileInfo;
  */
 final class DependencyDirectionTest extends TestCase
 {
-    public function testHarnessReferencesNeitherShopwareNorTheProbe(): void
+    public function testHarnessReferencesNoShopwareAndOnlyTheLibAmongDanNamespaces(): void
     {
-        self::assertSame([], $this->violations(directory: 'src', forbiddenPrefixes: [
-            'Shopware\\',
-            'Dan\\Probe\\',
+        self::assertSame([], $this->violations(directory: 'src', forbiddenPrefixes: ['Shopware\\'], allowedDanNamespaces: [
+            'Dan\\Harness\\',
+            'Dan\\Lib\\',
         ]));
     }
 
-    public function testProbeNeverReferencesTheHarness(): void
+    public function testProbeReferencesOnlyTheLibAmongDanNamespaces(): void
     {
-        self::assertSame([], $this->violations(directory: 'bundle/src', forbiddenPrefixes: ['Dan\\Harness\\']));
+        // The probe's vendor platform (Shopware, Symfony, Doctrine) is its
+        // runtime; among DAN's own namespaces only the lib is legal.
+        self::assertSame([], $this->violations(directory: 'bundle/src', forbiddenPrefixes: [], allowedDanNamespaces: [
+            'Dan\\Probe\\',
+            'Dan\\Lib\\',
+        ]));
     }
 
     public function testLibReferencesOnlyItself(): void
@@ -53,11 +58,17 @@ final class DependencyDirectionTest extends TestCase
     }
 
     /**
+     * Flags every reference to a forbidden namespace prefix, and every
+     * reference to a DAN namespace outside the package's allowed set - a
+     * deny-list alone would let a reference to a new (or misspelled)
+     * `Dan\...` namespace slip through.
+     *
      * @param list<string> $forbiddenPrefixes
+     * @param list<string> $allowedDanNamespaces
      *
      * @return list<string> human-readable violation descriptions
      */
-    private function violations(string $directory, array $forbiddenPrefixes): array
+    private function violations(string $directory, array $forbiddenPrefixes, array $allowedDanNamespaces): array
     {
         $violations = [];
         foreach ($this->qualifiedNamesByFile($directory) as $file => $names) {
@@ -67,10 +78,30 @@ final class DependencyDirectionTest extends TestCase
                         $violations[] = sprintf('%s references %s', $file, $name);
                     }
                 }
+                if (str_starts_with($name, 'Dan\\') && !$this->startsWithAny(name: $name, prefixes: $allowedDanNamespaces)) {
+                    $violations[] = sprintf('%s references %s', $file, $name);
+                }
             }
         }
 
         return $violations;
+    }
+
+    /**
+     * @param list<string> $prefixes
+     */
+    private function startsWithAny(string $name, array $prefixes): bool
+    {
+        foreach ($prefixes as $prefix) {
+            // The bare namespace itself is a reference too: a file declaring
+            // `namespace Dan\Probe;` tokenizes as the prefix minus its
+            // trailing separator.
+            if (str_starts_with($name, $prefix) || $name === rtrim($prefix, '\\')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
