@@ -59,6 +59,110 @@ final class ProtocolResolverTest extends TestCase
         self::assertTrue($protocol->equals($restored));
     }
 
+    public function testAcceptsTheBoundaryProtocol(): void
+    {
+        // The smallest legal protocol: exactly one measured iteration in one
+        // block with no warmup. Off-by-one validation drift would reject it.
+        $resolver = new ProtocolResolver();
+
+        $protocol = $resolver->resolve(
+            databaseSpecs: ['mysql:8.0'],
+            tiers: ['S'],
+            warmupIterations: 0,
+            measuredIterations: 1,
+            blocks: 1,
+            scenarioFilter: null,
+        );
+
+        self::assertSame(0, $protocol->warmupIterations);
+        self::assertSame(1, $protocol->measuredIterations);
+        self::assertSame(1, $protocol->blocks);
+    }
+
+    public function testDeduplicatesTiersKeepingFirstOccurrenceOrder(): void
+    {
+        $resolver = new ProtocolResolver();
+
+        $protocol = $resolver->resolve(
+            databaseSpecs: ['mysql:8.0'],
+            tiers: [
+                'M',
+                'S',
+                'M',
+                'S',
+            ],
+            warmupIterations: 0,
+            measuredIterations: 10,
+            blocks: 2,
+            scenarioFilter: null,
+        );
+
+        self::assertSame([
+            Tier::M,
+            Tier::S,
+        ], $protocol->tiers);
+    }
+
+    public function testRejectsZeroMeasuredIterations(): void
+    {
+        $resolver = new ProtocolResolver();
+
+        $this->expectException(InvalidArgumentException::class);
+        $resolver->resolve(
+            databaseSpecs: ['mysql:8.0'],
+            tiers: ['S'],
+            warmupIterations: 0,
+            measuredIterations: 0,
+            blocks: 1,
+            scenarioFilter: null,
+        );
+    }
+
+    public function testRejectsNegativeWarmup(): void
+    {
+        $resolver = new ProtocolResolver();
+
+        $this->expectException(InvalidArgumentException::class);
+        $resolver->resolve(
+            databaseSpecs: ['mysql:8.0'],
+            tiers: ['S'],
+            warmupIterations: -1,
+            measuredIterations: 10,
+            blocks: 1,
+            scenarioFilter: null,
+        );
+    }
+
+    public function testRejectsZeroBlocks(): void
+    {
+        $resolver = new ProtocolResolver();
+
+        $this->expectException(InvalidArgumentException::class);
+        $resolver->resolve(
+            databaseSpecs: ['mysql:8.0'],
+            tiers: ['S'],
+            warmupIterations: 0,
+            measuredIterations: 10,
+            blocks: 0,
+            scenarioFilter: null,
+        );
+    }
+
+    public function testRejectsEmptyTierList(): void
+    {
+        $resolver = new ProtocolResolver();
+
+        $this->expectException(InvalidArgumentException::class);
+        $resolver->resolve(
+            databaseSpecs: ['mysql:8.0'],
+            tiers: [],
+            warmupIterations: 0,
+            measuredIterations: 10,
+            blocks: 1,
+            scenarioFilter: null,
+        );
+    }
+
     public function testRejectsUnknownTier(): void
     {
         $resolver = new ProtocolResolver();

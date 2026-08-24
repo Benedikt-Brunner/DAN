@@ -15,6 +15,11 @@ parameters:
         show_rule_names: true
     scanDirectories:
         - vendor/squizlabs/php_codesniffer/src
+        # Eris defines its generator functions as side effects of the class
+        # files, invisible to autoload-based discovery.
+        - vendor/giorgiosironi/eris/src
+    stubFiles:
+        - dev/PhpStan/Stubs/eris-generators.stub
     paths:
         - src
         - lib/src
@@ -24,6 +29,8 @@ parameters:
     excludePaths:
         # Deliberately violates the named-arguments rule it tests.
         - tests/PhpStan/Fixtures
+        # Consumed via stubFiles above, not as analyzable sources.
+        - dev/PhpStan/Stubs
 
 rules:
     - Dan\Harness\Dev\PhpStan\RequireNamedArgumentsRule

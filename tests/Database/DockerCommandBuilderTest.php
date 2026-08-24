@@ -85,6 +85,20 @@ final class DockerCommandBuilderTest extends TestCase
         self::assertSame('mariadb-dump', $command->arguments[4]);
     }
 
+    public function testTheReadinessProbeForcesTcpSoTheInitialisationServerCannotAnswerIt(): void
+    {
+        $command = DockerCommandBuilder::probeDatabase(
+            instance: $this->instance(),
+            rootPassword: 'dan',
+        )->build();
+
+        // The temporary server the entrypoint runs while initialising the
+        // data directory listens on the socket only. A socket probe would
+        // report ready before the real server has replaced it.
+        self::assertContains('--protocol=TCP', $command->arguments);
+        self::assertContains('--host=127.0.0.1', $command->arguments);
+    }
+
     /**
      * @return iterable<string, array{string}>
      */

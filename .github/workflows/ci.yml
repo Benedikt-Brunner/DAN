@@ -30,10 +30,8 @@ jobs:
         run: vendor/bin/phpstan analyse --no-progress
       - name: pest (unit)
         run: vendor/bin/pest
-      # Gate starts at the measured baseline (covered MSI 72% when wired) and
-      # ratchets toward >= 85 as the Phase 1 property tests land.
       - name: infection (mutation gate, deterministic core)
-        run: vendor/bin/infection --threads=max --no-progress --logger-github --min-covered-msi=70
+        run: vendor/bin/infection --threads=max --no-progress --logger-github --min-covered-msi=85
 
   bundle-quality:
     name: Bundle static analysis + kernel integration tests

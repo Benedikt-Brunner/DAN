@@ -100,6 +100,14 @@ final class DockerCommandBuilder
             instance: $instance,
             rootPassword: $rootPassword,
             clientArguments: [
+                // Both official entrypoints run a temporary server with
+                // networking disabled to initialise the data directory, then
+                // shut it down and start the real one. A socket probe answers
+                // during that phase, so readiness would be declared moments
+                // before the socket disappears again; TCP only answers once
+                // the real server is listening.
+                '--protocol=TCP',
+                '--host=127.0.0.1',
                 '--execute',
                 'SELECT 1',
             ],

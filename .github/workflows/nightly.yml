@@ -1,10 +1,8 @@
-name: Mutation report
+name: Nightly deep checks
 
-# Nightly full-src mutation report (infection.full.json5). Unlike the PR
-# quality gate - which mutates only the deterministic core and enforces a
-# minimum covered MSI - this run covers the whole harness and never fails
-# the build: it exists to watch scope drift, i.e. boundary code that grew
-# logic without growing tests.
+# The slow, thorough variants of the PR-gated checks: a full-src mutation
+# report that never gates, and high-iteration property runs. Scope and
+# policy for both: the testing decision log in ROADMAP.md.
 
 on:
   schedule:
@@ -42,3 +40,21 @@ jobs:
             infection.log
             infection-summary.log
           retention-days: 90
+
+  deep-properties:
+    name: High-iteration property tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_sqlite
+          coverage: none
+      - run: composer install --no-interaction --no-progress
+      - name: pest (2000 iterations per property)
+        run: vendor/bin/pest
+        env:
+          DAN_PROPERTY_ITERATIONS: '2000'
