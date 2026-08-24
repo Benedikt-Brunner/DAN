@@ -4,11 +4,11 @@ Instructions for coding agents working in this repository. DAN profiles the SQL 
 
 ## Monorepo layout
 
-Three Composer packages with separate vendor dirs, PHPStan configs, and PHPUnit setups:
+Three Composer packages with separate vendor dirs, PHPStan configs, and test setups:
 
-- **Root (`dan/harness`)** — `Dan\Harness\` in `src/`, the plain Symfony Console application (`bin/dan`) that orchestrates runs.
-- **`lib/` (`dan/lib`)** — `Dan\Lib\` in `lib/src/`, framework-independent contracts and value objects shared by both runtime packages.
-- **`bundle/` (`dan/probe`)** — `Dan\Probe\` in `bundle/src/`, a Symfony bundle installed *inside* each DAL runtime under test.
+- **Root (`dan/harness`)** — `Dan\Harness\` in `src/`, the plain Symfony Console application (`bin/dan`) that orchestrates runs. PHP ≥ 8.4; test runner is Pest.
+- **`lib/` (`dan/lib`)** — `Dan\Lib\` in `lib/src/`, framework-independent contracts and value objects shared by both runtime packages. PHP ≥ 8.2 (must load everywhere the probe does).
+- **`bundle/` (`dan/probe`)** — `Dan\Probe\` in `bundle/src/`, a Symfony bundle installed *inside* each DAL runtime under test. PHP ≥ 8.2 (matches supported DAL versions); test runner stays plain PHPUnit.
 
 The harness and probe communicate only via CLI: the harness builds a DAL runtime from a Shopware skeleton with the probe (Composer path repo), then invokes the probe's `dan:execute` / `dan:seed` commands and parses their JSON output.
 
@@ -25,10 +25,13 @@ composer check            # lint + phpstan + unit tests — the gate
 composer lint             # php-cs-fixer --dry-run + phpcs
 composer lint:fix         # phpcbf, then php-cs-fixer
 composer phpstan          # level max + dead-code + deprecation rules
-composer test             # phpunit, tests/ (includes the lib tests)
-vendor/bin/phpunit --filter SomeTest                    # single test class/method
-vendor/bin/phpunit tests/Comparison/RunComparatorTest.php  # single file
+composer test             # pest, tests/ (includes the lib tests)
+composer test:mutation    # infection over the deterministic core (needs pcov or xdebug)
+vendor/bin/pest --filter SomeTest                    # single test class/method
+vendor/bin/pest tests/Comparison/RunComparatorTest.php  # single file
 ```
+
+Mutation testing note: Infection drives the suite through its PHPUnit adapter (Infection has no Pest adapter anymore), so every test that must kill mutants is written as a PHPUnit class — which Pest runs unmodified. Pest-DSL files are reserved for tests where mutation coverage is meaningless (e.g. architecture rules).
 
 Bundle: see `bundle/AGENTS.md` (own `composer install`, own PHPStan/PHPUnit).
 

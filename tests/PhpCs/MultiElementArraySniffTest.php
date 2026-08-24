@@ -7,13 +7,10 @@ namespace Dan\Harness\Tests\PhpCs;
 use PHP_CodeSniffer\Config;
 use PHP_CodeSniffer\Files\LocalFile;
 use PHP_CodeSniffer\Ruleset;
-use PHPUnit\Framework\Attributes\PreserveGlobalState;
-use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
+use PHP_CodeSniffer\Util\Tokens;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
-#[RunTestsInSeparateProcesses]
-#[PreserveGlobalState(false)]
 final class MultiElementArraySniffTest extends TestCase
 {
     public function testAcceptsSingleEntryAndMultilineArrays(): void
@@ -63,6 +60,9 @@ final class MultiElementArraySniffTest extends TestCase
     private function lint(string $code): LocalFile
     {
         require_once dirname(__DIR__, 2) . '/vendor/squizlabs/php_codesniffer/autoload.php';
+        // Loading Tokens defines PHPCS's polyfilled T_* constants, which
+        // PSR-12 sniff property initializers reference at instantiation.
+        class_exists(Tokens::class);
         if (!defined('PHP_CODESNIFFER_VERBOSITY')) {
             define('PHP_CODESNIFFER_VERBOSITY', 0);
         }

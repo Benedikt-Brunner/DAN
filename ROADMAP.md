@@ -4,13 +4,13 @@ Working plan, ordered by dependency. Each item has a **done-when** so progress i
 
 ## Phase 0 — Toolchain split (unblocks everything below)
 
-- [ ] **Split PHP floors.** Harness `composer.json` moves to `php: >=8.4` (QA tooling included); probe keeps its low floor (matches supported DAL versions; only the probe runs inside DAL runtimes). Local dev + CI use PHP 8.4 for the harness, 8.2 for the probe.
+- [x] **Split PHP floors.** Harness `composer.json` moves to `php: >=8.4` (QA tooling included); probe keeps its low floor (matches supported DAL versions; only the probe runs inside DAL runtimes). Local dev + CI use PHP 8.4 for the harness, 8.2 for the probe.
   *Done when:* `composer install` + full QA pass on 8.4 at the root, bundle suite still runs on 8.2.
-- [ ] **Adopt Pest v5 as the harness test runner.** Existing PHPUnit-class tests run unmodified under Pest; new tests use Pest style. Probe kernel tests stay plain PHPUnit (Shopware `TestBootstrapper` world).
+- [x] **Adopt Pest v5 as the harness test runner.** Existing PHPUnit-class tests run unmodified under Pest; new tests use Pest style *where mutation coverage is irrelevant* (see next item — mutation-killing tests stay PHPUnit-class style, which Pest runs unmodified). Probe kernel tests stay plain PHPUnit (Shopware `TestBootstrapper` world).
   *Done when:* `vendor/bin/pest` runs the whole harness suite green; `composer test` points at Pest.
-- [ ] **Wire Infection against the Pest suite.** Mutation scope = deterministic core only (`Comparison`, `Measurement`, `Protocol`, `RunStore`); boundary classes (`Database`, `Implementation\Runtime\Runtime`, `Implementation\Runtime\RuntimeFactory`, `Measurement\Execution\GridCellMeasurer`) excluded.
-  *Done when:* `infection.json5` exists, a full run completes locally in minutes, baseline covered-MSI recorded.
-- [ ] **Update CI:** quality job on PHP 8.4 (Pest + Infection gate `min-covered-msi` ≥ 85, ratchet upward later), bundle job stays on 8.2, nightly full-`src/` mutation report job.
+- [x] **Wire Infection against the suite.** Mutation scope = deterministic core only (`Comparison`, `Measurement`, `Protocol`, `RunStore`); boundary classes (`Database`, `Implementation\Runtime\Runtime`, `Implementation\Runtime\RuntimeFactory`, `Measurement\Execution\GridCellMeasurer`) excluded. Infection ≥ 0.30 has no Pest adapter, so it drives the same tests through its PHPUnit adapter (Pest v5 is built on PHPUnit 13).
+  *Done when:* `infection.json5` exists, a full run completes locally in minutes, baseline covered-MSI recorded. **Baseline covered MSI: 72% (2026-08-23, 317 mutations, 230 killed).**
+- [x] **Update CI:** quality job on PHP 8.4 (Pest + Infection gate `min-covered-msi`, starting at the measured 72% baseline (gate 70) and ratcheting to ≥ 85 as the Phase 1 property tests land), bundle job stays on 8.2, nightly full-`src/` mutation report job.
   *Done when:* both jobs green on a PR; a deliberately weakened test fails the mutation gate.
 
 ## Phase 1 — Test quality (the trust core)
