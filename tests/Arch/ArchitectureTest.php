@@ -6,10 +6,11 @@ declare(strict_types=1);
 // namespaces through the root Composer autoloader, so it only sees names that
 // are autoloadable here - references to namespaces absent from the root
 // vendor dir (Shopware, the probe's Doctrine) are invisible to it. The
-// cross-package dependency directions therefore live in
-// DependencyDirectionTest, which scans the parsed tokens of all three source
-// trees instead. Every rule below is proven non-vacuous: adding the forbidden
-// import makes it fail.
+// cross-package dependency directions therefore live in the phpat rules
+// inside the PHPStan gates (tests/Arch/DependencyDirectionRules.php and
+// bundle/tests/Arch/DependencyDirectionRules.php), which work on parsed
+// relations instead. Every rule below is proven non-vacuous: adding the
+// forbidden import makes it fail.
 //
 // These are Pest-DSL tests (arch() has no PHPUnit form); they live in their
 // own "arch" test suite so Infection's PHPUnit adapter - which cannot load

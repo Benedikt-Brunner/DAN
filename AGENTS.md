@@ -12,7 +12,7 @@ Three Composer packages with separate vendor dirs, PHPStan configs, and test set
 
 The harness and probe communicate only via CLI: the harness builds a DAL runtime from a Shopware skeleton with the probe (Composer path repo), then invokes the probe's `dan:execute` / `dan:seed` commands and parses their JSON output.
 
-**Dependency direction (inviolable):** `Dan\Harness\` never imports `Shopware\*`. `Dan\Probe\` imports only `Dan\Lib\` outside its own namespace. `Dan\Lib\` imports neither consumer. Nothing enforces this yet — you are the enforcement.
+**Dependency direction (inviolable):** `Dan\Harness\` never imports `Shopware\*`. `Dan\Probe\` imports only `Dan\Lib\` outside its own namespace. `Dan\Lib\` imports neither consumer. Enforced by phpat rules inside both PHPStan gates (`tests/Arch/DependencyDirectionRules.php`, `bundle/tests/Arch/DependencyDirectionRules.php`) plus the pest `arch()` suite — but write conforming code, don't lean on the gate.
 
 Run artifacts: `runs/<session>/<slot>/manifest.json` + `cells/*.json` are the source of truth; `index.sqlite` is derived from them.
 
