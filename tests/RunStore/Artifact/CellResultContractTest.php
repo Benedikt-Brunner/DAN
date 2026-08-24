@@ -46,6 +46,11 @@ final class CellResultContractTest extends TestCase
         self::assertFalse($cell->statements[0]->divergent);
         self::assertSame(1, $cell->statements[1]->index);
         self::assertSame('SELECT `category`.`id`, `category`.`name` FROM `category` WHERE `category`.`id` = ?', $cell->statements[1]->sql);
+        self::assertSame([
+            310000,
+            305000,
+            322000,
+        ], $cell->statements[1]->durationSamples->toNsArray());
         self::assertTrue($cell->statements[1]->divergent);
     }
 
