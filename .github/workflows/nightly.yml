@@ -1,17 +1,8 @@
 name: Nightly deep checks
 
-# The slow, thorough variants of the PR-gated checks:
-#
-# - Full-src mutation report (infection.full.json5). Unlike the PR quality
-#   gate - which mutates only the deterministic core and enforces a minimum
-#   covered MSI - this run covers the whole harness and never fails the
-#   build: it exists to watch scope drift, i.e. boundary code that grew
-#   logic without growing tests.
-#
-# - High-iteration property tests. PR runs keep Eris's default 100
-#   iterations per property; this run multiplies the sampled input space
-#   with a fresh random seed. A failure prints the reproducing ERIS_SEED
-#   command.
+# The slow, thorough variants of the PR-gated checks: a full-src mutation
+# report that never gates, and high-iteration property runs. Scope and
+# policy for both: the testing decision log in ROADMAP.md.
 
 on:
   schedule:
