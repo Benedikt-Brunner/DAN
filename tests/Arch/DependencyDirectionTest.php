@@ -48,7 +48,7 @@ final class DependencyDirectionTest extends TestCase
         $violations = [];
         foreach ($this->qualifiedNamesByFile('lib/src') as $file => $names) {
             foreach ($names as $name) {
-                if (!str_starts_with($name, 'Dan\\Lib\\')) {
+                if (!$this->matchesNamespace(name: $name, prefix: 'Dan\\Lib\\')) {
                     $violations[] = sprintf('%s references %s', $file, $name);
                 }
             }
@@ -74,11 +74,11 @@ final class DependencyDirectionTest extends TestCase
         foreach ($this->qualifiedNamesByFile($directory) as $file => $names) {
             foreach ($names as $name) {
                 foreach ($forbiddenPrefixes as $prefix) {
-                    if (str_starts_with($name, $prefix)) {
+                    if ($this->matchesNamespace(name: $name, prefix: $prefix)) {
                         $violations[] = sprintf('%s references %s', $file, $name);
                     }
                 }
-                if (str_starts_with($name, 'Dan\\') && !$this->startsWithAny(name: $name, prefixes: $allowedDanNamespaces)) {
+                if ($this->matchesNamespace(name: $name, prefix: 'Dan\\') && !$this->startsWithAny(name: $name, prefixes: $allowedDanNamespaces)) {
                     $violations[] = sprintf('%s references %s', $file, $name);
                 }
             }
@@ -93,15 +93,28 @@ final class DependencyDirectionTest extends TestCase
     private function startsWithAny(string $name, array $prefixes): bool
     {
         foreach ($prefixes as $prefix) {
-            // The bare namespace itself is a reference too: a file declaring
-            // `namespace Dan\Probe;` tokenizes as the prefix minus its
-            // trailing separator.
-            if (str_starts_with($name, $prefix) || $name === rtrim($prefix, '\\')) {
+            if ($this->matchesNamespace(name: $name, prefix: $prefix)) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    /**
+     * PHP resolves namespace and class names case-insensitively, so the scan
+     * must match that way too - a mixed-case `use SHOPWARE\...` is a working
+     * dependency that a case-sensitive comparison would let through. The bare
+     * namespace itself is a reference as well: a file declaring
+     * `namespace Dan\Probe;` tokenizes as the prefix minus its trailing
+     * separator.
+     */
+    private function matchesNamespace(string $name, string $prefix): bool
+    {
+        $normalizedName = strtolower($name);
+        $normalizedPrefix = strtolower($prefix);
+
+        return str_starts_with($normalizedName, $normalizedPrefix) || $normalizedName === rtrim($normalizedPrefix, '\\');
     }
 
     /**
