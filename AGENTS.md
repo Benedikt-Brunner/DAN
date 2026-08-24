@@ -127,7 +127,7 @@ Test-writing rules:
 
 - **Never use factory methods to create the service under test in unit tests** — construct it directly with `new` and explicit dependencies.
 - **Property tests extend `PropertyTestCase`** (Eris; random seed per run, `DAN_PROPERTY_ITERATIONS` raises iterations on the nightly). Domain-object generators live in `DomainGenerators`; Eris yields untyped values, so narrow everything through its `as*()` helpers — never operate on a generated `mixed`. Inside a property, assert refusals with try/catch + `self::fail()`, never `expectException()` (which would end the test after the first iteration). Keep list generators size-bounded (`DomainGenerators::boundedList()`).
-- **Renderers get exact-output regression tests** (byte-for-byte expected strings), so formatting changes surface as reviewable diffs.
+- **Renderers get exact-output regression tests** — golden-file snapshots under the test's `snapshots/` directory, so formatting changes surface as reviewable diffs. `DAN_UPDATE_SNAPSHOTS=1 vendor/bin/pest tests/Report` regenerates them after an intended change.
 - **Test compiled behavior, not configuration text.** A service-wiring test that greps YAML proves nothing; kernel tests assert the container actually builds the service / the repository actually performs CRUD / the emitted SQL contains the expected shape (`JSON_EXTRACT`).
 - Tests mirror source namespaces directory-for-directory and move together with the code they cover.
 
