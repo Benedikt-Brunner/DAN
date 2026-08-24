@@ -6,14 +6,8 @@
          failOnWarning="true"
          colors="true">
     <testsuites>
-        <!-- The unit suite must stay loadable by plain PHPUnit: Infection's
-             PHPUnit adapter runs it (Pest-DSL files have no test classes). -->
         <testsuite name="unit">
             <directory>tests</directory>
-            <exclude>tests/Arch</exclude>
-        </testsuite>
-        <testsuite name="arch">
-            <directory>tests/Arch</directory>
         </testsuite>
     </testsuites>
     <source>

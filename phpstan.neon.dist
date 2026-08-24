@@ -10,9 +10,7 @@ parameters:
     level: max
     treatPhpDocTypesAsCertain: false
     phpat:
-        # Relations with PHP core and extension classes are never
-        # architecture violations; without this the lib's only-itself rule
-        # would flag RuntimeException.
+        # PHP core and extension classes are never architecture violations.
         ignore_built_in_classes: true
         show_rule_names: true
     scanDirectories:

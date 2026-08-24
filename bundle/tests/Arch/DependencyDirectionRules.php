@@ -13,8 +13,7 @@ use PHPat\Test\PHPat;
  * phpat rule inside the bundle's PHPStan gate (registered in
  * bundle/phpstan.neon.dist). The probe's vendor platform - Shopware,
  * Symfony, Doctrine - is its runtime and stays legal; among DAN's own
- * namespaces only the lib is. The harness-side rules live in the root
- * tests/Arch, where the harness and lib sources are analyzable.
+ * namespaces only the lib is.
  */
 final class DependencyDirectionRules
 {
@@ -26,8 +25,7 @@ final class DependencyDirectionRules
             ->classes(
                 Selector::inNamespace('Dan\Probe'),
                 Selector::inNamespace('Dan\Lib'),
-                // Anything outside DAN's own namespaces is vendor territory
-                // and governed by composer.json, not by this rule.
+                // Outside DAN's namespaces is vendor territory, governed by composer.json.
                 Selector::classname('/^(?!Dan\\\\)/', true),
             )
             ->because('the probe runs inside DAL runtimes and may share only the lib with the harness (AGENTS.md, dependency direction)');

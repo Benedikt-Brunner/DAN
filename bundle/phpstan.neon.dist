@@ -9,8 +9,7 @@ parameters:
     level: max
     treatPhpDocTypesAsCertain: false
     phpat:
-        # Relations with PHP core and extension classes are never
-        # architecture violations.
+        # PHP core and extension classes are never architecture violations.
         ignore_built_in_classes: true
         show_rule_names: true
     paths:

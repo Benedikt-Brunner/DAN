@@ -32,8 +32,7 @@
     "autoload-dev": {
         "psr-4": {
             "Dan\\Harness\\Dev\\": "dev/",
-            "Dan\\Harness\\Tests\\": "tests/",
-            "Dan\\Probe\\": "bundle/src/"
+            "Dan\\Harness\\Tests\\": "tests/"
         },
         "classmap": [
             "tests/PhpStan/Fixtures/"
