@@ -17,6 +17,7 @@
         "giorgiosironi/eris": "^1.1",
         "infection/infection": "^0.35",
         "pestphp/pest": "^5.1",
+        "phpat/phpat": "^0.12.4",
         "phpstan/phpstan": "^2",
         "phpstan/phpstan-deprecation-rules": "^2",
         "phpunit/phpunit": "^13.3",

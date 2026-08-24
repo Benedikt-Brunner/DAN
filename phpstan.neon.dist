@@ -4,10 +4,15 @@
 includes:
     - vendor/shipmonk/dead-code-detector/rules.neon
     - vendor/phpstan/phpstan-deprecation-rules/rules.neon
+    - vendor/phpat/phpat/extension.neon
 
 parameters:
     level: max
     treatPhpDocTypesAsCertain: false
+    phpat:
+        # PHP core and extension classes are never architecture violations.
+        ignore_built_in_classes: true
+        show_rule_names: true
     scanDirectories:
         - vendor/squizlabs/php_codesniffer/src
     paths:
@@ -22,3 +27,9 @@ parameters:
 
 rules:
     - Dan\Harness\Dev\PhpStan\RequireNamedArgumentsRule
+
+services:
+    -
+        class: Dan\Harness\Tests\Arch\DependencyDirectionRules
+        tags:
+            - phpat.test
