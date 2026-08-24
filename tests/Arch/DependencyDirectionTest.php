@@ -6,6 +6,7 @@ namespace Dan\Harness\Tests\Arch;
 
 use FilesystemIterator;
 use PhpToken;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -45,16 +46,111 @@ final class DependencyDirectionTest extends TestCase
         // Framework-freedom by construction: every namespace-qualified name
         // in lib/src must be lib's own. Global imports (RuntimeException,
         // Traversable, ...) are unqualified and stay legal.
-        $violations = [];
-        foreach ($this->qualifiedNamesByFile('lib/src') as $file => $names) {
-            foreach ($names as $name) {
-                if (!$this->matchesNamespace(name: $name, prefix: 'Dan\\Lib\\')) {
-                    $violations[] = sprintf('%s references %s', $file, $name);
-                }
-            }
-        }
+        self::assertSame([], $this->libOnlyViolationsAmong($this->qualifiedNamesByFile('lib/src')));
+    }
 
-        self::assertSame([], $violations);
+    /**
+     * The rules must stay provably non-vacuous: over the real source trees
+     * they can only ever assert zero violations, so a matcher that stopped
+     * firing would keep them green forever. Every forbidden shape - plain,
+     * mixed-case, inline, attribute, and the grouped-use forms the tokenizer
+     * splits apart - is injected as an in-memory snippet and must produce
+     * exactly its violation through the same tokenizer and rules the real
+     * scans use.
+     *
+     * @param list<string> $expectedViolations
+     */
+    #[DataProvider('forbiddenReferenceSnippets')]
+    public function testTheHarnessRuleFlagsEveryInjectedForbiddenReference(string $source, array $expectedViolations): void
+    {
+        self::assertSame($expectedViolations, $this->violationsAmong(
+            namesByFile: ['snippet.php' => $this->qualifiedNamesIn($source)],
+            forbiddenPrefixes: ['Shopware\\'],
+            allowedDanNamespaces: [
+                'Dan\\Harness\\',
+                'Dan\\Lib\\',
+            ],
+        ));
+    }
+
+    /**
+     * @return array<string, array{string, list<string>}>
+     */
+    public static function forbiddenReferenceSnippets(): array
+    {
+        return [
+            'a plain use statement' => [
+                '<?php use Shopware\Core\Framework\Uuid\Uuid;',
+                ['snippet.php references Shopware\Core\Framework\Uuid\Uuid'],
+            ],
+            'a mixed-case use statement' => [
+                '<?php use SHOPWARE\Core\Defaults;',
+                ['snippet.php references SHOPWARE\Core\Defaults'],
+            ],
+            'an inline fully qualified reference' => [
+                '<?php $language = \Shopware\Core\Defaults::LANGUAGE_SYSTEM;',
+                ['snippet.php references Shopware\Core\Defaults'],
+            ],
+            'an attribute reference' => [
+                '<?php #[\Shopware\Core\Framework\Log\Package(\'core\')] final class Widget {}',
+                ['snippet.php references Shopware\Core\Framework\Log\Package'],
+            ],
+            'a grouped use with a single-segment prefix' => [
+                '<?php use Shopware\{Component\Foo, Bar};',
+                [
+                    'snippet.php references Shopware\Component\Foo',
+                    'snippet.php references Shopware\Bar',
+                ],
+            ],
+            'a grouped use with a fully qualified prefix' => [
+                '<?php use \Shopware\{Component\Baz};',
+                ['snippet.php references Shopware\Component\Baz'],
+            ],
+            'a grouped use with a qualified prefix' => [
+                '<?php use Shopware\Core\{Framework\Uuid, Defaults};',
+                [
+                    'snippet.php references Shopware\Core\Framework\Uuid',
+                    'snippet.php references Shopware\Core\Defaults',
+                    'snippet.php references Shopware\Core',
+                ],
+            ],
+            'an aliased grouped member' => [
+                '<?php use Shopware\{Component\Foo as ComponentFoo};',
+                ['snippet.php references Shopware\Component\Foo'],
+            ],
+            'an unapproved Dan namespace' => [
+                '<?php use Dan\Probe\DanProbeBundle;',
+                ['snippet.php references Dan\Probe\DanProbeBundle'],
+            ],
+            'a mixed-case unapproved Dan namespace' => [
+                '<?php use DAN\PROBE\DanProbeBundle;',
+                ['snippet.php references DAN\PROBE\DanProbeBundle'],
+            ],
+        ];
+    }
+
+    public function testTheHarnessRuleAcceptsLegalReferences(): void
+    {
+        $source = '<?php namespace Dan\Harness\Comparison; use Dan\Lib\Time\Duration; use RuntimeException; use Symfony\Component\Console\Command\Command; $separator = \DIRECTORY_SEPARATOR;';
+
+        self::assertSame([], $this->violationsAmong(
+            namesByFile: ['snippet.php' => $this->qualifiedNamesIn($source)],
+            forbiddenPrefixes: ['Shopware\\'],
+            allowedDanNamespaces: [
+                'Dan\\Harness\\',
+                'Dan\\Lib\\',
+            ],
+        ));
+    }
+
+    public function testTheLibRuleFlagsInjectedForeignReferences(): void
+    {
+        $source = '<?php namespace Dan\Lib\Time; use Symfony\Component\Clock\Clock;';
+
+        self::assertSame(
+            ['snippet.php references Symfony\Component\Clock\Clock'],
+            $this->libOnlyViolationsAmong(['snippet.php' => $this->qualifiedNamesIn($source)]),
+        );
     }
 
     /**
@@ -70,8 +166,24 @@ final class DependencyDirectionTest extends TestCase
      */
     private function violations(string $directory, array $forbiddenPrefixes, array $allowedDanNamespaces): array
     {
+        return $this->violationsAmong(
+            namesByFile: $this->qualifiedNamesByFile($directory),
+            forbiddenPrefixes: $forbiddenPrefixes,
+            allowedDanNamespaces: $allowedDanNamespaces,
+        );
+    }
+
+    /**
+     * @param array<string, list<string>> $namesByFile
+     * @param list<string> $forbiddenPrefixes
+     * @param list<string> $allowedDanNamespaces
+     *
+     * @return list<string> human-readable violation descriptions
+     */
+    private function violationsAmong(array $namesByFile, array $forbiddenPrefixes, array $allowedDanNamespaces): array
+    {
         $violations = [];
-        foreach ($this->qualifiedNamesByFile($directory) as $file => $names) {
+        foreach ($namesByFile as $file => $names) {
             foreach ($names as $name) {
                 foreach ($forbiddenPrefixes as $prefix) {
                     if ($this->matchesNamespace(name: $name, prefix: $prefix)) {
@@ -79,6 +191,25 @@ final class DependencyDirectionTest extends TestCase
                     }
                 }
                 if ($this->matchesNamespace(name: $name, prefix: 'Dan\\') && !$this->startsWithAny(name: $name, prefixes: $allowedDanNamespaces)) {
+                    $violations[] = sprintf('%s references %s', $file, $name);
+                }
+            }
+        }
+
+        return $violations;
+    }
+
+    /**
+     * @param array<string, list<string>> $namesByFile
+     *
+     * @return list<string> human-readable violation descriptions
+     */
+    private function libOnlyViolationsAmong(array $namesByFile): array
+    {
+        $violations = [];
+        foreach ($namesByFile as $file => $names) {
+            foreach ($names as $name) {
+                if (!$this->matchesNamespace(name: $name, prefix: 'Dan\\Lib\\')) {
                     $violations[] = sprintf('%s references %s', $file, $name);
                 }
             }
@@ -129,21 +260,7 @@ final class DependencyDirectionTest extends TestCase
             if (!$file instanceof SplFileInfo || $file->getExtension() !== 'php') {
                 continue;
             }
-            $fileNames = [];
-            // Token names, not T_* constants: PHPCS (scanned by PHPStan)
-            // polyfills the same constants as strings, poisoning their type.
-            foreach (PhpToken::tokenize((string) file_get_contents($file->getPathname())) as $token) {
-                if ($token->getTokenName() === 'T_NAME_QUALIFIED') {
-                    $fileNames[] = $token->text;
-                } elseif ($token->getTokenName() === 'T_NAME_FULLY_QUALIFIED') {
-                    $name = ltrim($token->text, '\\');
-                    // A fully-qualified GLOBAL symbol (\RuntimeException,
-                    // \DIRECTORY_SEPARATOR) is not a namespace reference.
-                    if (str_contains($name, '\\')) {
-                        $fileNames[] = $name;
-                    }
-                }
-            }
+            $fileNames = $this->qualifiedNamesIn((string) file_get_contents($file->getPathname()));
             if ($fileNames !== []) {
                 $names[substr($file->getPathname(), strlen($root) + 1)] = $fileNames;
             }
@@ -155,5 +272,82 @@ final class DependencyDirectionTest extends TestCase
         self::assertNotSame([], $names, sprintf('No PHP files with qualified names found under "%s".', $directory));
 
         return $names;
+    }
+
+    /**
+     * Every namespace-qualified name the given PHP source references. A
+     * grouped `use Prefix\{Member, ...}` needs recombination: the tokenizer
+     * emits the prefix and the members as separate tokens - for a
+     * single-segment prefix not even as a name token - so neither side alone
+     * carries the full dependency.
+     *
+     * @return list<string>
+     */
+    private function qualifiedNamesIn(string $source): array
+    {
+        $tokens = [];
+        foreach (PhpToken::tokenize($source) as $token) {
+            if (!$token->isIgnorable()) {
+                $tokens[] = $token;
+            }
+        }
+
+        $names = [];
+        $count = count($tokens);
+        for ($index = 0; $index < $count; ++$index) {
+            $name = $this->nameOf($tokens[$index]);
+            if ($name === null) {
+                continue;
+            }
+            if ($index + 2 < $count && $tokens[$index + 1]->text === '\\' && $tokens[$index + 2]->text === '{') {
+                $expectMember = true;
+                $member = $index + 3;
+                for (; $member < $count && $tokens[$member]->text !== '}'; ++$member) {
+                    if ($tokens[$member]->text === ',') {
+                        $expectMember = true;
+                        continue;
+                    }
+                    $memberName = $this->nameOf($tokens[$member]);
+                    if ($expectMember && $memberName !== null) {
+                        $names[] = $name . '\\' . $memberName;
+                        // Only the first name of each group segment is the
+                        // reference; an `as` alias that follows is not.
+                        $expectMember = false;
+                    }
+                }
+                if (str_contains($name, '\\')) {
+                    $names[] = $name;
+                }
+                // Jump past the group so its members are not re-recorded
+                // prefix-less by the outer loop.
+                $index = $member;
+                continue;
+            }
+            // A lone identifier (T_STRING) or fully-qualified GLOBAL symbol
+            // (\RuntimeException, \DIRECTORY_SEPARATOR) is not a namespace
+            // reference.
+            if (str_contains($name, '\\')) {
+                $names[] = $name;
+            }
+        }
+
+        return $names;
+    }
+
+    /**
+     * The token's namespace-name reading, or null for any token that cannot
+     * be one. Token names, not T_* constants: PHPCS (scanned by PHPStan)
+     * polyfills the same constants as strings, poisoning their type. Plain
+     * T_STRING identifiers only count where the caller knows they sit in
+     * name position (a grouped-use prefix or member).
+     */
+    private function nameOf(PhpToken $token): ?string
+    {
+        return match ($token->getTokenName()) {
+            'T_STRING' => $token->text,
+            'T_NAME_QUALIFIED' => $token->text,
+            'T_NAME_FULLY_QUALIFIED' => ltrim($token->text, '\\'),
+            default => null,
+        };
     }
 }
