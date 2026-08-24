@@ -39,15 +39,21 @@ final class RunManifestPropertyTest extends PropertyTestCase
             $payload = $manifest->toArray();
             $payload['schemaVersion'] = $foreignVersion;
 
+            // fail() must stay outside the try: AssertionFailedError extends
+            // RuntimeException, so inside it the catch would swallow the
+            // failure and an accepted payload could never fail the property.
             try {
                 RunManifest::fromDecodedArray($payload);
-                self::fail('The malformed input was accepted.');
             } catch (RuntimeException) {
-                $this->addToAssertionCount(1);
                 // Refused - exactly what the property demands. A plain
                 // expectException would end the test after the first
                 // iteration and silently skip every other generated case.
+                $this->addToAssertionCount(1);
+
+                return;
             }
+
+            self::fail(sprintf('Schema version %d was accepted.', $foreignVersion));
         });
     }
 
@@ -134,21 +140,28 @@ final class RunManifestPropertyTest extends PropertyTestCase
             Generator\elements(...$corruptions),
         )->then(function (RunManifest $manifest, mixed $corruption): void {
             $parts = DomainGenerators::asList($corruption);
+            $path = DomainGenerators::asPath($parts[0]);
             $payload = DomainGenerators::corruptedAt(
                 payload: $manifest->toArray(),
-                path: DomainGenerators::asPath($parts[0]),
+                path: $path,
                 junk: $parts[1],
             );
 
+            // fail() must stay outside the try: AssertionFailedError extends
+            // RuntimeException, so inside it the catch would swallow the
+            // failure and an accepted payload could never fail the property.
             try {
                 RunManifest::fromDecodedArray($payload);
-                self::fail('The malformed input was accepted.');
             } catch (RuntimeException) {
-                $this->addToAssertionCount(1);
                 // Refused - exactly what the property demands. A plain
                 // expectException would end the test after the first
                 // iteration and silently skip every other generated case.
+                $this->addToAssertionCount(1);
+
+                return;
             }
+
+            self::fail(sprintf('Corrupting "%s" was accepted.', implode('.', $path)));
         });
     }
 
@@ -161,15 +174,21 @@ final class RunManifestPropertyTest extends PropertyTestCase
             $payload = $manifest->toArray();
             $payload['implementation']['reference']['type'] = $unknownType;
 
+            // fail() must stay outside the try: AssertionFailedError extends
+            // RuntimeException, so inside it the catch would swallow the
+            // failure and an accepted payload could never fail the property.
             try {
                 RunManifest::fromDecodedArray($payload);
-                self::fail('The malformed input was accepted.');
             } catch (RuntimeException) {
-                $this->addToAssertionCount(1);
                 // Refused - exactly what the property demands. A plain
                 // expectException would end the test after the first
                 // iteration and silently skip every other generated case.
+                $this->addToAssertionCount(1);
+
+                return;
             }
+
+            self::fail(sprintf('Reference type "%s" was accepted.', $unknownType));
         });
     }
 }

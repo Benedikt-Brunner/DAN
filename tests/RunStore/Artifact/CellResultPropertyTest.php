@@ -38,36 +38,61 @@ final class CellResultPropertyTest extends PropertyTestCase
         $this->forAll(
             DomainGenerators::cellResult(),
             DomainGenerators::samples(),
-        )->then(function (CellResult $blockA, mixed $otherWallSamples): void {
+            DomainGenerators::samples(),
+        )->then(function (CellResult $blockA, mixed $otherWallSamples, mixed $otherDurations): void {
             $otherWallSamples = DomainGenerators::asIntList($otherWallSamples);
+            // The second block carries its own duration samples - were they
+            // shared with the first block's, a merge that drops either
+            // side's samples would still compare equal below.
+            $otherDurations = DomainGenerators::asIntList($otherDurations);
+            $statementsB = [];
+            foreach ($blockA->statements as $statement) {
+                $statementsB[] = new StatementProfile(
+                    index: $statement->index,
+                    sql: $statement->sql,
+                    durationSamples: SampleCollection::fromArray($otherDurations),
+                    divergent: $statement->divergent,
+                );
+            }
             $blockB = new CellResult(
                 scenario: $blockA->scenario,
                 tier: $blockA->tier,
                 database: $blockA->database,
                 wallSamples: SampleCollection::fromArray($otherWallSamples),
-                statements: $blockA->statements,
+                statements: StatementProfileCollection::create($statementsB),
             );
 
             $ab = $blockA->merge($blockB);
             $ba = $blockB->merge($blockA);
 
+            $expectedWall = [
+                ...$blockA->wallSamples->toNsArray(),
+                ...$otherWallSamples,
+            ];
+            sort($expectedWall);
             $abWall = $ab->wallSamples->toNsArray();
             $baWall = $ba->wallSamples->toNsArray();
-            self::assertCount(count($blockA->wallSamples) + count($otherWallSamples), $abWall);
             sort($abWall);
             sort($baWall);
-            self::assertSame($abWall, $baWall);
+            self::assertSame($expectedWall, $abWall);
+            self::assertSame($expectedWall, $baWall);
             self::assertSame(
                 Statistics::create($ab->wallSamples)->median()->toNsFloat(),
                 Statistics::create($ba->wallSamples)->median()->toNsFloat(),
             );
 
             foreach ($ab->statements as $index => $statement) {
+                $expectedDurations = [
+                    ...$blockA->statements[$index]->durationSamples->toNsArray(),
+                    ...$otherDurations,
+                ];
+                sort($expectedDurations);
                 $abDurations = $statement->durationSamples->toNsArray();
                 $baDurations = $ba->statements[$index]->durationSamples->toNsArray();
                 sort($abDurations);
                 sort($baDurations);
-                self::assertSame($abDurations, $baDurations);
+                self::assertSame($expectedDurations, $abDurations);
+                self::assertSame($expectedDurations, $baDurations);
             }
         });
     }
@@ -89,8 +114,13 @@ final class CellResultPropertyTest extends PropertyTestCase
 
     public function testMergingDifferentSqlAtAnyPositionFlagsExactlyThatStatement(): void
     {
-        $this->forAll(DomainGenerators::cellResult())->then(function (CellResult $cell): void {
-            $position = count($cell->statements) - 1;
+        $this->forAll(
+            DomainGenerators::cellResult(),
+            Generator\choose(0, 1000),
+        )->then(function (CellResult $cell, int $positionSeed): void {
+            // Any position, not just the last - a merge that only compares
+            // the tail of the sequence must fail here.
+            $position = $positionSeed % count($cell->statements);
             $changed = [];
             foreach ($cell->statements as $index => $statement) {
                 $changed[] = new StatementProfile(
@@ -233,21 +263,28 @@ final class CellResultPropertyTest extends PropertyTestCase
             Generator\elements(...$corruptions),
         )->then(function (CellResult $cell, mixed $corruption): void {
             $parts = DomainGenerators::asList($corruption);
+            $path = DomainGenerators::asPath($parts[0]);
             $payload = DomainGenerators::corruptedAt(
                 payload: $cell->toArray(),
-                path: DomainGenerators::asPath($parts[0]),
+                path: $path,
                 junk: $parts[1],
             );
 
+            // fail() must stay outside the try: AssertionFailedError extends
+            // RuntimeException, so inside it the catch would swallow the
+            // failure and an accepted payload could never fail the property.
             try {
                 CellResult::fromDecodedArray($payload);
-                self::fail('The malformed input was accepted.');
             } catch (RuntimeException) {
-                $this->addToAssertionCount(1);
                 // Refused - exactly what the property demands. A plain
                 // expectException would end the test after the first
                 // iteration and silently skip every other generated case.
+                $this->addToAssertionCount(1);
+
+                return;
             }
+
+            self::fail(sprintf('Corrupting "%s" was accepted.', implode('.', $path)));
         });
     }
 
@@ -300,15 +337,21 @@ final class CellResultPropertyTest extends PropertyTestCase
             $payload = $cell->toArray();
             $payload['schemaVersion'] = $foreignVersion;
 
+            // fail() must stay outside the try: AssertionFailedError extends
+            // RuntimeException, so inside it the catch would swallow the
+            // failure and an accepted payload could never fail the property.
             try {
                 CellResult::fromDecodedArray($payload);
-                self::fail('The malformed input was accepted.');
             } catch (RuntimeException) {
-                $this->addToAssertionCount(1);
                 // Refused - exactly what the property demands. A plain
                 // expectException would end the test after the first
                 // iteration and silently skip every other generated case.
+                $this->addToAssertionCount(1);
+
+                return;
             }
+
+            self::fail(sprintf('Schema version %d was accepted.', $foreignVersion));
         });
     }
 }

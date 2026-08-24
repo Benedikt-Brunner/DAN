@@ -48,15 +48,21 @@ final class ProtocolPropertyTest extends PropertyTestCase
             $payload = $protocol->toArray();
             $payload['tiers'][] = $unknownTier;
 
+            // fail() must stay outside the try: AssertionFailedError extends
+            // RuntimeException, so inside it the catch would swallow the
+            // failure and an accepted payload could never fail the property.
             try {
                 Protocol::fromDecodedArray($payload);
-                self::fail('The malformed input was accepted.');
             } catch (RuntimeException) {
-                $this->addToAssertionCount(1);
                 // Refused - exactly what the property demands. A plain
                 // expectException would end the test after the first
                 // iteration and silently skip every other generated case.
+                $this->addToAssertionCount(1);
+
+                return;
             }
+
+            self::fail(sprintf('Tier "%s" was accepted.', $unknownTier));
         });
     }
 
@@ -108,21 +114,28 @@ final class ProtocolPropertyTest extends PropertyTestCase
             Generator\elements(...$corruptions),
         )->then(function (Protocol $protocol, mixed $corruption): void {
             $parts = DomainGenerators::asList($corruption);
+            $path = DomainGenerators::asPath($parts[0]);
             $payload = DomainGenerators::corruptedAt(
                 payload: $protocol->toArray(),
-                path: DomainGenerators::asPath($parts[0]),
+                path: $path,
                 junk: $parts[1],
             );
 
+            // fail() must stay outside the try: AssertionFailedError extends
+            // RuntimeException, so inside it the catch would swallow the
+            // failure and an accepted payload could never fail the property.
             try {
                 Protocol::fromDecodedArray($payload);
-                self::fail('The malformed input was accepted.');
             } catch (RuntimeException) {
-                $this->addToAssertionCount(1);
                 // Refused - exactly what the property demands. A plain
                 // expectException would end the test after the first
                 // iteration and silently skip every other generated case.
+                $this->addToAssertionCount(1);
+
+                return;
             }
+
+            self::fail(sprintf('Corrupting "%s" was accepted.', implode('.', $path)));
         });
     }
 
@@ -161,15 +174,22 @@ final class ProtocolPropertyTest extends PropertyTestCase
             '',
             'sqlite',
         ))->then(function (string $malformedSpec): void {
+            // fail() sits outside the try for the same reason as everywhere
+            // else in this suite - here it would even work inside (an
+            // AssertionFailedError is no InvalidArgumentException), but one
+            // uniform shape keeps the broken variant from being copied.
             try {
                 DatabaseTarget::fromString($malformedSpec);
-                self::fail('The malformed input was accepted.');
             } catch (InvalidArgumentException) {
-                $this->addToAssertionCount(1);
                 // Refused - exactly what the property demands. A plain
                 // expectException would end the test after the first
                 // iteration and silently skip every other generated case.
+                $this->addToAssertionCount(1);
+
+                return;
             }
+
+            self::fail(sprintf('Spec "%s" was accepted.', $malformedSpec));
         });
     }
 }

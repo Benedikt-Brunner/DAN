@@ -8,6 +8,7 @@ use Eris\Attributes\ErisShrink;
 use Eris\Quantifier\ForAll;
 use Eris\TestTrait;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 
 /**
  * Base class for Eris property-based tests. Seeds are random on every run;
@@ -30,7 +31,14 @@ abstract class PropertyTestCase extends TestCase
     protected function forAll(mixed ...$generators): ForAll
     {
         $iterations = getenv('DAN_PROPERTY_ITERATIONS');
-        if (is_string($iterations) && $iterations !== '' && ctype_digit($iterations)) {
+        if (is_string($iterations) && $iterations !== '') {
+            // A set-but-broken value must fail loudly: silently ignoring a
+            // typo (or accepting '0', which ctype_digit does) would turn the
+            // nightly deep run into a default-iteration run - or into no
+            // iterations at all - without anyone noticing.
+            if (!ctype_digit($iterations) || (int) $iterations < 1) {
+                throw new RuntimeException(sprintf('DAN_PROPERTY_ITERATIONS must be a positive integer, got "%s".', $iterations));
+            }
             $this->limitTo((int) $iterations);
         }
 
