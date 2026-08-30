@@ -77,6 +77,7 @@ final class Runtime
                     'APP_ENV' => 'prod',
                     'APP_SECRET' => 'dan-not-a-secret',
                     'APP_URL' => 'http://localhost:8000',
+                    'PROJECT_ROOT' => $this->workingDirectory->toString(),
                     'SHOPWARE_SKIP_WEBINSTALLER' => '1',
                 ],
             ),

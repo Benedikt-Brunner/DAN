@@ -45,6 +45,7 @@ final class RuntimeTest extends TestCase
             'APP_ENV' => 'prod',
             'APP_SECRET' => 'dan-not-a-secret',
             'APP_URL' => 'http://localhost:8000',
+            'PROJECT_ROOT' => '/runtimes/release-6.6.5.0',
             'SHOPWARE_SKIP_WEBINSTALLER' => '1',
         ], $command->environment);
         self::assertNull($command->timeout);
