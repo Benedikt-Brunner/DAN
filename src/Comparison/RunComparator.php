@@ -44,6 +44,7 @@ final class RunComparator
             baselineManifest: $baselineManifest,
             candidateManifest: $candidateManifest,
             protocolsMatch: $baselineManifest->protocol->equals($candidateManifest->protocol),
+            environmentsComparable: $baselineManifest->environment->comparableTo($candidateManifest->environment),
             cells: $cells,
             cellsOnlyInBaseline: array_values(array_diff($baselineFiles, $candidateFiles)),
             cellsOnlyInCandidate: array_values(array_diff($candidateFiles, $baselineFiles)),

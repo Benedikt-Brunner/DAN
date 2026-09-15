@@ -6,6 +6,11 @@ namespace Dan\Harness\Tests\Comparison;
 
 use Dan\Harness\Comparison\AlignmentKind;
 use Dan\Harness\Comparison\RunComparator;
+use Dan\Harness\Environment\DatabaseImage;
+use Dan\Harness\Environment\DatabaseNetworkPath;
+use Dan\Harness\Environment\DockerEngine;
+use Dan\Harness\Environment\ExecutionEnvironment;
+use Dan\Harness\Environment\HostMachine;
 use Dan\Harness\Gate\Policy;
 use Dan\Harness\Gate\ViolationKind;
 use Dan\Harness\Implementation\Identity\Identity;
@@ -81,6 +86,7 @@ final class RunComparatorTest extends TestCase
         $comparison = RunComparator::compare(baseline: $baseline, candidate: $candidate);
 
         self::assertTrue($comparison->protocolsMatch);
+        self::assertTrue($comparison->environmentsComparable);
         self::assertCount(1, $comparison->cells);
         // IN-list arity differences are data-shape noise, not SQL changes.
         self::assertFalse($comparison->cells[0]->sqlChanged());
@@ -225,6 +231,15 @@ final class RunComparatorTest extends TestCase
             implementationReference: 'v6.6.0.0',
             implementationIdentity: new Identity(id: 'fp-' . $slot->value, label: 'label ' . $slot->value),
             protocol: $protocol,
+            environment: new ExecutionEnvironment(
+                danRevision: str_repeat('d', 64),
+                phpVersion: '8.4.24',
+                composerVersion: '2.10.3',
+                host: new HostMachine(operatingSystem: 'Linux 6.8.0-1021-azure', architecture: 'x86_64', cpuModel: 'AMD EPYC 7763 64-Core Processor', cpuLimit: null, memoryLimitBytes: null),
+                dockerEngine: new DockerEngine(version: '29.5.2', operatingSystem: 'Ubuntu 24.04.4 LTS', architecture: 'x86_64', cpus: 4, memoryBytes: 16_775_622_656, userlandProxy: false),
+                databaseImages: [new DatabaseImage(target: new DatabaseTarget(engine: Engine::MySql, version: '8.0'), digest: 'sha256:7dcddc01f13bab2f15cde676d44d01f61fc9f99fe7785e86196dfc07d358ae2b')],
+                databaseNetworkPath: DatabaseNetworkPath::PublishedPort,
+            ),
         ));
         if ($blocks === []) {
             $blocks = [

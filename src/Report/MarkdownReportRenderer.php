@@ -10,6 +10,8 @@ use Dan\Harness\Comparison\BlockComparison;
 use Dan\Harness\Comparison\CellComparison;
 use Dan\Harness\Comparison\RunComparison;
 use Dan\Harness\Comparison\StatementInstability;
+use Dan\Harness\Environment\DatabaseImage;
+use Dan\Harness\Environment\ExecutionEnvironment;
 use Dan\Harness\Gate\Violation;
 use Dan\Harness\Gate\ViolationKind;
 use Dan\Harness\Measurement\Scheduling\RunSlot;
@@ -42,6 +44,11 @@ final class MarkdownReportRenderer
         $this->appendBlockDiagnostics(markdown: $markdown, cells: $comparison->cells);
         $this->appendMissingCells(markdown: $markdown, side: 'A', cells: $comparison->cellsOnlyInBaseline);
         $this->appendMissingCells(markdown: $markdown, side: 'B', cells: $comparison->cellsOnlyInCandidate);
+        $this->appendReproducibility(
+            markdown: $markdown,
+            baseline: $comparison->baselineManifest->environment,
+            candidate: $comparison->candidateManifest->environment,
+        );
 
         return $markdown->build();
     }
@@ -77,6 +84,13 @@ final class MarkdownReportRenderer
             $markdown
                 ->line('> [!WARNING]')
                 ->line('> The two runs were recorded under **different protocols**. Latency comparisons below are not meaningful.')
+                ->blankLine();
+        }
+
+        if (!$comparison->environmentsComparable) {
+            $markdown
+                ->line('> [!WARNING]')
+                ->line('> The two runs were recorded by **different DAN revisions or database images** (see Reproducibility). SQL comparisons may reflect the tooling or the image rather than the implementation.')
                 ->blankLine();
         }
 
@@ -380,6 +394,56 @@ final class MarkdownReportRenderer
         $markdown
             ->line(sprintf('Cells only present in run %s: %s', $side, implode(', ', $formattedCells)))
             ->blankLine();
+    }
+
+    /**
+     * The facts an outsider needs to reproduce or audit the measurement. One
+     * column per run: within a session both are the same, across stored
+     * profiles the differences are exactly what this table is for.
+     */
+    private function appendReproducibility(MarkdownBuilder $markdown, ExecutionEnvironment $baseline, ExecutionEnvironment $candidate): void
+    {
+        $markdown
+            ->heading('Reproducibility')
+            ->blankLine()
+            ->line('| | A (baseline) | B (candidate) |')
+            ->line('|---|---|---|');
+        foreach ($this->environmentFacts($baseline) as $fact => $baselineValue) {
+            $markdown->tableRow([
+                $fact,
+                $baselineValue,
+                $this->environmentFacts($candidate)[$fact] ?? 'unknown',
+            ]);
+        }
+        $markdown->blankLine();
+    }
+
+    /**
+     * @return array<string, string> fact name => formatted value ("unknown" when not discovered)
+     */
+    private function environmentFacts(ExecutionEnvironment $environment): array
+    {
+        $engine = $environment->dockerEngine;
+
+        return [
+            'DAN revision' => sprintf('`%s`', substr($environment->danRevision, 0, 12)),
+            'PHP' => $environment->phpVersion,
+            'Composer' => $environment->composerVersion ?? 'unknown',
+            'Host' => sprintf('%s, %s', $environment->host->operatingSystem, $environment->host->architecture),
+            'Host CPU' => $environment->host->cpuModel ?? 'unknown',
+            'Host CPU limit' => $environment->host->cpuLimit === null ? 'unknown' : sprintf('%.2f cores', $environment->host->cpuLimit),
+            'Host memory limit' => $environment->host->memoryLimitBytes === null ? 'unknown' : sprintf('%.1f GiB', $environment->host->memoryLimitBytes / 1024 ** 3),
+            'Docker engine' => $engine === null ? 'unknown' : sprintf('%s on %s, %s, %d CPUs, %.1f GiB', $engine->version, $engine->operatingSystem, $engine->architecture, $engine->cpus, $engine->memoryBytes / 1024 ** 3),
+            'Database network path' => $environment->databaseNetworkPath->value . match ($engine?->userlandProxy) {
+                true => ' (userland proxy)',
+                false => ' (kernel NAT, userland proxy disabled)',
+                null => '',
+            },
+            'Database images' => implode(', ', array_map(
+                fn (DatabaseImage $image): string => sprintf('%s @ %s', $image->target->id(), $image->digest === null ? 'unknown digest' : '`' . substr($image->digest, 0, 19) . '`'),
+                $environment->databaseImages,
+            )),
+        ];
     }
 
     private function describeViolation(Violation $violation): string
