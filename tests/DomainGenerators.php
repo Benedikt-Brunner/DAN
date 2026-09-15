@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace Dan\Harness\Tests;
 
+use Dan\Harness\Environment\DatabaseImage;
+use Dan\Harness\Environment\DatabaseNetworkPath;
+use Dan\Harness\Environment\DockerEngine;
+use Dan\Harness\Environment\ExecutionEnvironment;
+use Dan\Harness\Environment\HostMachine;
 use Dan\Harness\Implementation\Identity\Identity;
 use Dan\Harness\Implementation\Reference\ReferenceType;
 use Dan\Harness\Measurement\Result\SampleCollection;
@@ -37,6 +42,8 @@ use LogicException;
  */
 final class DomainGenerators
 {
+    private const int ENVIRONMENT_VARIANTS = 4;
+
     private const array SQL_SHAPES = [
         'SELECT `product`.`id` FROM product WHERE id IN (?, ?, ?)',
         'SELECT name FROM category WHERE parent_id = :parent',
@@ -248,18 +255,44 @@ final class DomainGenerators
         );
     }
 
+    /**
+     * An execution environment whose database images match the given
+     * protocol's targets. Drawn from a few canned host/engine variants
+     * (every optional fact known in some, explicitly unknown in others) plus
+     * a random DAN revision and per-image digests: deliberately few tuple
+     * elements, because Eris shrinks a tuple as the cartesian product of its
+     * elements' options and a wide tuple makes any failing property run out
+     * of memory before it can report.
+     *
+     * @return Generator<mixed>
+     */
+    public static function executionEnvironment(Protocol $protocol): Generator
+    {
+        return Generator\map(
+            fn (array $parts): ExecutionEnvironment => self::buildExecutionEnvironment(parts: $parts, protocol: $protocol),
+            Generator\tuple(
+                Generator\choose(0, 2_147_483_647),
+                Generator\choose(0, self::ENVIRONMENT_VARIANTS - 1),
+                Generator\vector(count($protocol->databases), Generator\elements(null, 0, 1, 2)),
+            ),
+        );
+    }
+
     /** @return Generator<mixed> */
     public static function runManifest(): Generator
     {
-        return Generator\map(
-            self::buildRunManifest(...),
-            Generator\tuple(
-                Generator\choose(1, 999_999),
-                Generator\choose(0, 2_147_483_647),
-                Generator\elements(...ReferenceType::cases()),
-                Generator\elements('v6.6.10.22', '/tmp/shopware', 'v6.7.0.0'),
-                self::identity(),
-                self::protocol(),
+        return Generator\bind(
+            self::protocol(),
+            fn (Protocol $protocol): Generator => Generator\map(
+                fn (array $parts): RunManifest => self::buildRunManifest(parts: $parts, protocol: $protocol),
+                Generator\tuple(
+                    Generator\choose(1, 999_999),
+                    Generator\choose(0, 2_147_483_647),
+                    Generator\elements(...ReferenceType::cases()),
+                    Generator\elements('v6.6.10.22', '/tmp/shopware', 'v6.7.0.0'),
+                    self::identity(),
+                    self::executionEnvironment($protocol),
+                ),
             ),
         );
     }
@@ -448,13 +481,18 @@ final class DomainGenerators
         return $value;
     }
 
-    public static function asProtocol(mixed $value): Protocol
+    public static function asExecutionEnvironment(mixed $value): ExecutionEnvironment
     {
-        if (!$value instanceof Protocol) {
-            throw new LogicException('Generated value is not a Protocol.');
+        if (!$value instanceof ExecutionEnvironment) {
+            throw new LogicException('Generated value is not an ExecutionEnvironment.');
         }
 
         return $value;
+    }
+
+    private static function asIntOrNull(mixed $value): ?int
+    {
+        return $value === null ? null : self::asInt($value);
     }
 
     /**
@@ -589,7 +627,49 @@ final class DomainGenerators
     /**
      * @param array<mixed> $parts
      */
-    private static function buildRunManifest(array $parts): RunManifest
+    private static function buildExecutionEnvironment(array $parts, Protocol $protocol): ExecutionEnvironment
+    {
+        $variant = self::asInt($parts[1]);
+        $digestSeeds = self::asList($parts[2]);
+        $images = [];
+        foreach ($protocol->databases as $index => $target) {
+            $seed = self::asIntOrNull($digestSeeds[$index] ?? null);
+            $images[] = new DatabaseImage(
+                target: $target,
+                digest: $seed === null ? null : 'sha256:' . str_repeat((string) $seed, 64),
+            );
+        }
+        $everythingKnown = $variant === 0;
+        $linux = $variant % 2 === 0;
+
+        return new ExecutionEnvironment(
+            danRevision: sprintf('%064x', self::asInt($parts[0])),
+            phpVersion: $linux ? '8.4.24' : '8.5.0',
+            composerVersion: $everythingKnown ? '2.10.3' : null,
+            host: new HostMachine(
+                operatingSystem: $linux ? 'Linux 6.8.0-1021-azure' : 'Darwin 25.6.0',
+                architecture: $linux ? 'x86_64' : 'arm64',
+                cpuModel: $variant === 3 ? null : ($linux ? 'AMD EPYC 7763 64-Core Processor' : 'Apple M4 Pro'),
+                cpuLimit: $everythingKnown ? 2.0 : null,
+                memoryLimitBytes: $everythingKnown ? 7_516_192_768 : null,
+            ),
+            dockerEngine: $variant === 3 ? null : new DockerEngine(
+                version: $variant === 2 ? '28.0.1' : '29.5.2',
+                operatingSystem: 'Ubuntu 24.04.4 LTS',
+                architecture: $linux ? 'x86_64' : 'aarch64',
+                cpus: 4,
+                memoryBytes: 16_000_000_000,
+                userlandProxy: $variant === 2 ? null : $everythingKnown,
+            ),
+            databaseImages: $images,
+            databaseNetworkPath: DatabaseNetworkPath::PublishedPort,
+        );
+    }
+
+    /**
+     * @param array<mixed> $parts
+     */
+    private static function buildRunManifest(array $parts, Protocol $protocol): RunManifest
     {
         return new RunManifest(
             runId: sprintf('run-%d', self::asInt($parts[0])),
@@ -599,7 +679,8 @@ final class DomainGenerators
             implementationReferenceType: self::asReferenceType($parts[2]),
             implementationReference: self::asString($parts[3]),
             implementationIdentity: self::asIdentity($parts[4]),
-            protocol: self::asProtocol($parts[5]),
+            protocol: $protocol,
+            environment: self::asExecutionEnvironment($parts[5]),
         );
     }
 }

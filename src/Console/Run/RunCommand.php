@@ -8,6 +8,7 @@ use Dan\Harness\Comparison\RunComparator;
 use Dan\Harness\Console\InputParser;
 use Dan\Harness\Database\DockerDatabaseManager;
 use Dan\Harness\Database\SnapshotCache;
+use Dan\Harness\Environment\EnvironmentResolver;
 use Dan\Harness\Gate\Policy;
 use Dan\Harness\Implementation\Identity\IdentityResolver;
 use Dan\Harness\Implementation\Reference\Reference;
@@ -16,6 +17,7 @@ use Dan\Harness\Measurement\Execution\GridCellMeasurer;
 use Dan\Harness\Measurement\Execution\SessionRun;
 use Dan\Harness\Measurement\Scheduling\BlockScheduler;
 use Dan\Harness\Measurement\Scheduling\RunSlot;
+use Dan\Harness\Process\SymfonyProcessRunner;
 use Dan\Harness\Protocol\ProtocolResolver;
 use Dan\Harness\Report\MarkdownReportRenderer;
 use Dan\Harness\RunStore\Artifact\RunManifest;
@@ -80,9 +82,15 @@ final class RunCommand extends Command
 
         $outRoot = $options->outputDirectory;
         $sessionDir = $outRoot->join(sprintf('%s-%s', date('Ymd-His'), substr(bin2hex(random_bytes(3)), 0, 6)));
+        $danRoot = Path::fromString(dirname(__DIR__, 3));
+
+        // Discovered once per session: both runs share the environment, and
+        // resolving it pulls the database images the cells will need anyway.
+        $output->writeln('Resolving the execution environment');
+        $environment = (new EnvironmentResolver(danRoot: $danRoot, processRunner: new SymfonyProcessRunner()))->resolve($protocol);
 
         $identityResolver = new IdentityResolver();
-        $runtimeFactory = new RuntimeFactory(runtimesDirectory: $outRoot->join('.dan-runtimes')->toPath(), probeBundlePath: Path::fromString(dirname(__DIR__, 3))->join('bundle'));
+        $runtimeFactory = new RuntimeFactory(runtimesDirectory: $outRoot->join('.dan-runtimes')->toPath(), probeBundlePath: $danRoot->join('bundle'));
 
         $slots = [
             RunSlot::Baseline,
@@ -103,6 +111,7 @@ final class RunCommand extends Command
                 implementationReference: $reference->toString(),
                 implementationIdentity: $identity,
                 protocol: $protocol,
+                environment: $environment,
             ));
             $output->writeln(sprintf('Run %s: <info>%s</info>', $slot->value, $identity->label));
 
