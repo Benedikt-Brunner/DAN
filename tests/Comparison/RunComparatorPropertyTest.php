@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Dan\Harness\Tests\Comparison;
 
+use Dan\Harness\Comparison\AlignmentKind;
 use Dan\Harness\Comparison\RunComparator;
 use Dan\Harness\Measurement\Result\MedianShiftEstimator;
 use Dan\Harness\Measurement\Result\SampleCollection;
@@ -58,8 +59,8 @@ final class RunComparatorPropertyTest extends PropertyTestCase
                     foreach ($comparison->cells as $cell) {
                         $fileName = (new CellId(scenario: $cell->scenario, tier: $cell->tier, database: $cell->database))->fileName();
 
-                        self::assertFalse($cell->sqlChanged);
-                        self::assertSame([], $cell->changedStatementIndices);
+                        self::assertFalse($cell->sqlChanged());
+                        self::assertSame([], $cell->alignment->changes());
                         self::assertSame(0.0, $cell->wallDeltaPct());
                         self::assertFalse($cell->wallShift->excludesZero(), 'Identical runs must never look significantly different.');
                         self::assertSame($cell->baselineStatementCount, $cell->candidateStatementCount);
@@ -103,8 +104,20 @@ final class RunComparatorPropertyTest extends PropertyTestCase
                     $comparison = RunComparator::compare(baseline: $baseline, candidate: $candidate, shiftEstimator: new MedianShiftEstimator(resamples: 50));
 
                     self::assertCount(1, $comparison->cells);
-                    self::assertSame($changedPositions !== [], $comparison->cells[0]->sqlChanged);
-                    self::assertSame($changedPositions, $comparison->cells[0]->changedStatementIndices);
+                    $alignment = $comparison->cells[0]->alignment;
+                    self::assertSame($changedPositions !== [], $alignment->sqlChanged());
+                    // A rewritten position can never align as unchanged, on
+                    // either side; with repeated statements around it the
+                    // alignment may honestly call it ambiguous instead of
+                    // modified, so the exact classification is only pinned
+                    // for repeat-free sequences.
+                    self::assertSame([], array_intersect($alignment->baselineIndices(AlignmentKind::Unchanged), $changedPositions));
+                    self::assertSame([], array_intersect($alignment->candidateIndices(AlignmentKind::Unchanged), $changedPositions));
+                    $fingerprints = array_map(fn ($statement) => $statement->sql, $cell->statements()->getItems());
+                    if (count(array_unique($fingerprints)) === count($fingerprints)) {
+                        self::assertSame($changedPositions, $alignment->baselineIndices(AlignmentKind::Modified));
+                        self::assertCount(count($changedPositions), $alignment->changes());
+                    }
                     self::assertTrue($comparison->cells[0]->hasUnstableStatements(), 'A divergence flag on either side must surface.');
                     $unstableSlots = array_map(fn ($instability) => $instability->slot, $comparison->cells[0]->unstableStatements);
                     self::assertContains($candidateCarriesDivergence ? RunSlot::Candidate : RunSlot::Baseline, $unstableSlots);

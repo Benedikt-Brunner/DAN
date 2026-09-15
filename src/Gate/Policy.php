@@ -32,7 +32,7 @@ final class Policy
     {
         $violations = [];
         foreach ($cells as $cell) {
-            if ($this->failOnSqlChange && $cell->sqlChanged) {
+            if ($this->failOnSqlChange && $cell->sqlChanged()) {
                 $violations[] = new Violation(kind: ViolationKind::SqlChanged, cell: $cell);
             }
             if ($this->maxWallRegressionPct !== null && $cell->wallShift->isRegressionBeyond($this->maxWallRegressionPct)) {
