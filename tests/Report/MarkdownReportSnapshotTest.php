@@ -8,6 +8,7 @@ use Dan\Harness\Comparison\AlignedStatement;
 use Dan\Harness\Comparison\AlignmentKind;
 use Dan\Harness\Comparison\BlockComparison;
 use Dan\Harness\Comparison\CellComparison;
+use Dan\Harness\Comparison\ResultSetComparison;
 use Dan\Harness\Comparison\RunComparison;
 use Dan\Harness\Comparison\StatementAlignment;
 use Dan\Harness\Comparison\StatementInstability;
@@ -24,6 +25,7 @@ use Dan\Harness\Protocol\Engine;
 use Dan\Harness\Protocol\Protocol;
 use Dan\Harness\Report\MarkdownReportRenderer;
 use Dan\Harness\RunStore\Artifact\RunManifest;
+use Dan\Lib\Protocol\ResultSet;
 use Dan\Lib\Protocol\ScenarioName;
 use Dan\Lib\Protocol\StatementDivergence;
 use Dan\Lib\Protocol\Tier;
@@ -129,6 +131,27 @@ final class MarkdownReportSnapshotTest extends TestCase
                 new StatementInstability(slot: RunSlot::Baseline, index: 3, divergence: StatementDivergence::Presence, observed: 5, iterations: 30),
                 new StatementInstability(slot: RunSlot::Candidate, index: 1, divergence: StatementDivergence::Text, observed: 30, iterations: 30),
             ]),
+            // Faster and wrong: fewer ids, a smaller total, and the
+            // candidate did not even agree with itself between iterations.
+            self::cell(scenario: 'product.deep-read', tier: Tier::M, database: $mysql, medianMs: [
+                40.0,
+                31.0,
+            ], p95Ms: [
+                44.0,
+                35.5,
+            ], resultSets: new ResultSetComparison(
+                baseline: new ResultSet(ids: [
+                    '0190d3d0a1b74a1c9f0e7b2c6d5e4f30',
+                    '0190d3d0a1b74a1c9f0e7b2c6d5e4f31',
+                    '0190d3d0a1b74a1c9f0e7b2c6d5e4f32',
+                ], total: 120),
+                candidate: new ResultSet(ids: [
+                    '0190d3d0a1b74a1c9f0e7b2c6d5e4f30',
+                    '0190d3d0a1b74a1c9f0e7b2c6d5e4f32',
+                ], total: 118),
+                baselineConsistent: true,
+                candidateConsistent: false,
+            )),
         ];
 
         $regressionCells = [
@@ -159,6 +182,7 @@ final class MarkdownReportSnapshotTest extends TestCase
         // The violations come from the real gate, so the report renders what
         // CI would actually enforce.
         $violations = (new Policy(maxWallRegressionPct: 10.0, failOnSqlChange: true))->evaluate($regressionCells);
+        $sqlChangeViolations = (new Policy(maxWallRegressionPct: null, failOnSqlChange: false))->evaluate($sqlChangeCells);
 
         return [
             'clean-aa' => [
@@ -181,7 +205,7 @@ final class MarkdownReportSnapshotTest extends TestCase
                     cellsOnlyInBaseline: [],
                     cellsOnlyInCandidate: [],
                 ),
-                'violations' => [],
+                'violations' => $sqlChangeViolations,
             ],
             'regression-with-violations' => [
                 'comparison' => new RunComparison(
@@ -269,6 +293,7 @@ final class MarkdownReportSnapshotTest extends TestCase
      * @param array{int, int} $statementCounts
      * @param list<StatementInstability> $unstableStatements
      * @param list<array{float, float}>|null $blockMedianMs baseline and candidate median per mirrored block pair; defaults to two pairs at the cell medians
+     * @param ResultSetComparison|null $resultSets defaults to identical, consistent results
      */
     private static function cell(
         string $scenario,
@@ -283,7 +308,12 @@ final class MarkdownReportSnapshotTest extends TestCase
         ],
         array $unstableStatements = [],
         ?array $blockMedianMs = null,
+        ?ResultSetComparison $resultSets = null,
     ): CellComparison {
+        $resultSet = new ResultSet(ids: [
+            '0190d3d0a1b74a1c9f0e7b2c6d5e4f30',
+            '0190d3d0a1b74a1c9f0e7b2c6d5e4f31',
+        ], total: 2);
         $blocks = [];
         foreach (
             $blockMedianMs ?? [
@@ -309,6 +339,7 @@ final class MarkdownReportSnapshotTest extends TestCase
             database: $database,
             baselineStatementCount: $statementCounts[0],
             candidateStatementCount: $statementCounts[1],
+            resultSets: $resultSets ?? new ResultSetComparison(baseline: $resultSet, candidate: $resultSet, baselineConsistent: true, candidateConsistent: true),
             alignment: self::alignment(statementCounts: $statementCounts, changedIndices: $changedIndices),
             baselineSampleCount: 30,
             candidateSampleCount: 30,

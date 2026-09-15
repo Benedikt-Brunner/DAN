@@ -75,6 +75,12 @@ final class RunComparator
             database: $baselineCell->database,
             baselineStatementCount: count($baselineStatements),
             candidateStatementCount: count($candidateStatements),
+            resultSets: new ResultSetComparison(
+                baseline: $baselineCell->resultSet(),
+                candidate: $candidateCell->resultSet(),
+                baselineConsistent: $baselineCell->resultSetConsistent(),
+                candidateConsistent: $candidateCell->resultSetConsistent(),
+            ),
             alignment: $alignment,
             baselineSampleCount: count($baselineWall),
             candidateSampleCount: count($candidateWall),

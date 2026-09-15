@@ -22,6 +22,7 @@ final class CellComparison
         public readonly DatabaseTarget $database,
         public readonly int $baselineStatementCount,
         public readonly int $candidateStatementCount,
+        public readonly ResultSetComparison $resultSets,
         public readonly StatementAlignment $alignment,
         public readonly int $baselineSampleCount,
         public readonly int $candidateSampleCount,
