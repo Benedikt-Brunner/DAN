@@ -40,6 +40,7 @@ final class MarkdownReportRenderer
         );
         $this->appendProtocol(markdown: $markdown, comparison: $comparison);
         $this->appendViolations(markdown: $markdown, violations: $violations);
+        $this->appendDatasetDivergence(markdown: $markdown, comparison: $comparison);
         $this->appendResultDivergence(markdown: $markdown, cells: $comparison->cells);
         $this->appendCellTables(markdown: $markdown, cells: $comparison->cells);
         $this->appendQueryPlans(markdown: $markdown, cells: $comparison->cells);
@@ -125,6 +126,29 @@ final class MarkdownReportRenderer
         $markdown->heading('Gate violations')->blankLine();
         foreach ($violations as $violation) {
             $markdown->line('- :x: ' . $this->describeViolation($violation));
+        }
+        $markdown->blankLine();
+    }
+
+    /**
+     * Before correctness of results comes correctness of the data they were
+     * computed over: two runs that did not seed the same dataset compare
+     * different work in every cell of that dataset.
+     */
+    private function appendDatasetDivergence(MarkdownBuilder $markdown, RunComparison $comparison): void
+    {
+        if ($comparison->datasetDivergences === []) {
+            return;
+        }
+
+        $markdown
+            ->heading('Dataset divergence')
+            ->blankLine()
+            ->line('> [!CAUTION]')
+            ->line('> The two runs did not seed logically equivalent datasets. Every comparison over these datasets is void: the implementations were measured against different data.')
+            ->blankLine();
+        foreach ($comparison->datasetDivergences as $divergence) {
+            $markdown->line(sprintf('- %s / %s: %s', $divergence->tier->value, $divergence->database->id(), implode('; ', $divergence->differences)));
         }
         $markdown->blankLine();
     }

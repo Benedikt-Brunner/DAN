@@ -25,11 +25,14 @@ use Dan\Harness\RunStore\Artifact\BlockResult;
 use Dan\Harness\RunStore\Artifact\BlockResultCollection;
 use Dan\Harness\RunStore\Artifact\CellId;
 use Dan\Harness\RunStore\Artifact\CellResult;
+use Dan\Harness\RunStore\Artifact\RecordedDataset;
 use Dan\Harness\RunStore\Artifact\RunManifest;
 use Dan\Harness\RunStore\Artifact\StatementProfile;
 use Dan\Harness\RunStore\Artifact\StatementProfileCollection;
 use Dan\Harness\RunStore\Filesystem\RunDirectory;
 use Dan\Lib\Filesystem\Path;
+use Dan\Lib\Protocol\DatasetAspect;
+use Dan\Lib\Protocol\DatasetFingerprint;
 use Dan\Lib\Protocol\PlanCapture;
 use Dan\Lib\Protocol\ResultSet;
 use Dan\Lib\Protocol\ScenarioName;
@@ -219,6 +222,37 @@ final class RunComparatorTest extends TestCase
         ], $cell->planChanges[0]->materialChanges());
     }
 
+    public function testRunsSeededOverLogicallyDifferentDatasetsAreReportedAsDivergent(): void
+    {
+        $baseline = $this->writeRun(slot: RunSlot::Baseline, wallNs: [10_000_000], sql: 'SELECT 1', dataset: self::dataset(products: 1000, productChecksum: '11-11'));
+        $candidate = $this->writeRun(slot: RunSlot::Candidate, wallNs: [10_000_000], sql: 'SELECT 1', dataset: self::dataset(products: 999, productChecksum: '12-12'));
+
+        $comparison = RunComparator::compare(baseline: $baseline, candidate: $candidate);
+
+        self::assertCount(1, $comparison->datasetDivergences);
+        self::assertSame(Tier::S, $comparison->datasetDivergences[0]->tier);
+        self::assertSame('mysql-8.0', $comparison->datasetDivergences[0]->database->id());
+        self::assertSame(['product: 1000 vs 999 rows'], $comparison->datasetDivergences[0]->differences);
+    }
+
+    public function testIdenticallySeededDatasetsAreNotDivergent(): void
+    {
+        $baseline = $this->writeRun(slot: RunSlot::Baseline, wallNs: [10_000_000], sql: 'SELECT 1');
+        $candidate = $this->writeRun(slot: RunSlot::Candidate, wallNs: [10_000_000], sql: 'SELECT 1');
+
+        self::assertSame([], RunComparator::compare(baseline: $baseline, candidate: $candidate)->datasetDivergences);
+        self::assertSame(['S--mysql-8.0.json'], $baseline->datasetFileNames());
+        self::assertSame(1000, $baseline->readDatasetByFileName('S--mysql-8.0.json')->fingerprint->aspects[0]->rows);
+    }
+
+    private static function dataset(int $products, string $productChecksum): DatasetFingerprint
+    {
+        return new DatasetFingerprint(tier: Tier::S, aspects: [
+            new DatasetAspect(name: 'product', rows: $products, checksum: $productChecksum),
+            new DatasetAspect(name: 'tax', rows: 1, checksum: '1-1'),
+        ]);
+    }
+
     public function testADifferentResultIsACorrectnessViolationWhateverTheLatency(): void
     {
         // Same SQL shape, candidate twice as fast - and returning one row
@@ -253,7 +287,7 @@ final class RunComparatorTest extends TestCase
      * @param list<int> $wallNs integer nanoseconds of the single block written when $blocks is empty
      * @param list<array{int, list<int>}> $blocks execution order plus wall samples per block, in block-index order
      */
-    private function writeRun(RunSlot $slot, array $wallNs, string $sql, array $blocks = [], ?ResultSet $resultSet = null, ?QueryPlan $plan = null): RunDirectory
+    private function writeRun(RunSlot $slot, array $wallNs, string $sql, array $blocks = [], ?ResultSet $resultSet = null, ?QueryPlan $plan = null, ?DatasetFingerprint $dataset = null): RunDirectory
     {
         $database = new DatabaseTarget(engine: Engine::MySql, version: '8.0');
         $protocol = new Protocol(
@@ -284,6 +318,7 @@ final class RunComparatorTest extends TestCase
                 databaseNetworkPath: DatabaseNetworkPath::PublishedPort,
             ),
         ));
+        $run->writeDataset(new RecordedDataset(tier: Tier::S, database: $database, fingerprint: $dataset ?? self::dataset(products: 1000, productChecksum: '11-11')));
         if ($blocks === []) {
             $blocks = [
                 [

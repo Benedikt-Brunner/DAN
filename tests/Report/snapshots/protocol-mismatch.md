@@ -14,6 +14,13 @@
 
 Protocol: 5 warmup + 30 measured iterations in 4 blocks, 2 warmup at the start of every block.
 
+## Dataset divergence
+
+> [!CAUTION]
+> The two runs did not seed logically equivalent datasets. Every comparison over these datasets is void: the implementations were measured against different data.
+
+- S / mysql-8.0: product: 1000 vs 998 rows; product.categories: same 1000 rows, different values
+
 Cells only present in run A: `product.deep-read--S--mysql-8.0.json`
 
 Cells only present in run B: `order.aggregation--S--mysql-8.0.json`

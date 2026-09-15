@@ -8,6 +8,7 @@ use Dan\Harness\Comparison\AlignedStatement;
 use Dan\Harness\Comparison\AlignmentKind;
 use Dan\Harness\Comparison\BlockComparison;
 use Dan\Harness\Comparison\CellComparison;
+use Dan\Harness\Comparison\DatasetDivergence;
 use Dan\Harness\Comparison\ResultSetComparison;
 use Dan\Harness\Comparison\RunComparison;
 use Dan\Harness\Comparison\StatementAlignment;
@@ -212,6 +213,7 @@ final class MarkdownReportSnapshotTest extends TestCase
                     candidateManifest: self::manifest(id: 'candidate-aaaaaaa', label: 'v6.6.10.22', recordedAt: '2026-08-20 10:20:00', protocol: $protocol),
                     protocolsMatch: true,
                     environmentsComparable: true,
+                    datasetDivergences: [],
                     cells: $cleanCells,
                     cellsOnlyInBaseline: [],
                     cellsOnlyInCandidate: [],
@@ -224,6 +226,7 @@ final class MarkdownReportSnapshotTest extends TestCase
                     candidateManifest: self::manifest(id: 'candidate-bbbbbbb', label: 'local checkout', recordedAt: '2026-08-20 10:20:00', protocol: $protocol),
                     protocolsMatch: true,
                     environmentsComparable: true,
+                    datasetDivergences: [],
                     cells: $sqlChangeCells,
                     cellsOnlyInBaseline: [],
                     cellsOnlyInCandidate: [],
@@ -236,6 +239,7 @@ final class MarkdownReportSnapshotTest extends TestCase
                     candidateManifest: self::manifest(id: 'candidate-ccccccc', label: 'local checkout', recordedAt: '2026-08-20 10:20:00', protocol: $protocol),
                     protocolsMatch: true,
                     environmentsComparable: true,
+                    datasetDivergences: [],
                     cells: $regressionCells,
                     cellsOnlyInBaseline: [],
                     cellsOnlyInCandidate: [],
@@ -248,6 +252,10 @@ final class MarkdownReportSnapshotTest extends TestCase
                     candidateManifest: self::manifest(id: 'candidate-ddddddd', label: 'v6.7.0.0', recordedAt: '2026-08-21 09:00:00', protocol: self::protocol(measuredIterations: 60), environment: self::environment(danRevision: str_repeat('e', 64), digest: null, dockerEngine: null)),
                     protocolsMatch: false,
                     environmentsComparable: false,
+                    datasetDivergences: [new DatasetDivergence(tier: Tier::S, database: $mysql, differences: [
+                        'product: 1000 vs 998 rows',
+                        'product.categories: same 1000 rows, different values',
+                    ])],
                     cells: [],
                     cellsOnlyInBaseline: ['product.deep-read--S--mysql-8.0.json'],
                     cellsOnlyInCandidate: ['order.aggregation--S--mysql-8.0.json'],
