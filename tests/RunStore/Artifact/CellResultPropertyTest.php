@@ -13,6 +13,7 @@ use Dan\Harness\RunStore\Artifact\StatementProfile;
 use Dan\Harness\RunStore\Artifact\StatementProfileCollection;
 use Dan\Harness\Tests\DomainGenerators;
 use Dan\Harness\Tests\PropertyTestCase;
+use Dan\Lib\Protocol\StatementDivergence;
 use Eris\Generator;
 use RuntimeException;
 
@@ -120,16 +121,47 @@ final class CellResultPropertyTest extends PropertyTestCase
         });
     }
 
-    public function testPoolingIdenticalStatementSequencesNeverFlagsDivergence(): void
+    public function testPoolingIdenticalStatementSequencesOnlyCarriesTheBlocksOwnDivergence(): void
     {
         $this->forAll(DomainGenerators::cellResult())->then(function (CellResult $cell): void {
             foreach ($cell->statements() as $index => $statement) {
+                $textDiffers = false;
+                $intermittent = false;
+                $observed = 0;
+                foreach ($cell->blocks as $block) {
+                    $textDiffers = $textDiffers || $block->statements[$index]->divergence->includesText();
+                    $intermittent = $intermittent || $block->statements[$index]->divergence->includesPresence();
+                    $observed += $block->statements[$index]->observed;
+                }
                 self::assertSame(
-                    $cell->blocks[0]->statements[$index]->divergent,
-                    $statement->divergent,
-                    'Pooling identical SQL across blocks must never introduce divergence.',
+                    StatementDivergence::fromFlags(textDiffers: $textDiffers, intermittent: $intermittent),
+                    $statement->divergence,
+                    'Pooling identical SQL across blocks must neither introduce nor lose divergence.',
                 );
+                self::assertSame($observed, $statement->observed);
             }
+        });
+    }
+
+    public function testAPositionMissingFromALaterBlockIsIntermittentInThePooledView(): void
+    {
+        $this->forAll(DomainGenerators::cellResult())->then(function (CellResult $cell): void {
+            // A later block that never produced the last position at all: its
+            // own profile cannot say so (there is nothing to record), only
+            // the pooled view can - by counting observations against the
+            // pooled iterations.
+            $statements = $cell->blocks[0]->statements;
+            $last = count($statements) - 1;
+            $truncated = StatementProfileCollection::create(array_slice($statements->getItems(), 0, $last));
+            $laterBlock = self::blockAfter(cell: $cell, statements: $truncated);
+
+            $merged = $cell->merge(self::withBlocks(cell: $cell, blocks: [$laterBlock]));
+
+            $pooled = $merged->statements();
+            self::assertCount(count($statements), $pooled);
+            self::assertTrue($pooled[$last]->divergence->includesPresence());
+            self::assertSame($cell->statements()[$last]->observed, $pooled[$last]->observed);
+            self::assertLessThan($merged->wallSamples()->count(), $pooled[$last]->observed);
         });
     }
 
@@ -149,7 +181,8 @@ final class CellResultPropertyTest extends PropertyTestCase
                     index: $statement->index,
                     sql: $index === $position ? $statement->sql . ' /* changed */' : $statement->sql,
                     durationSamples: $statement->durationSamples,
-                    divergent: $statement->divergent,
+                    observed: $statement->observed,
+                    divergence: $statement->divergence,
                 );
             }
             $laterBlock = self::withBlocks(cell: $cell, blocks: [self::blockAfter(cell: $cell, statements: StatementProfileCollection::create($changed))]);
@@ -157,31 +190,31 @@ final class CellResultPropertyTest extends PropertyTestCase
             $merged = $cell->merge($laterBlock);
 
             $pooled = $merged->statements();
-            self::assertTrue($pooled[$position]->divergent);
+            self::assertTrue($pooled[$position]->divergence->includesText());
             // The earliest block's SQL wins; averaging apples and oranges is
             // exactly what the flag prevents.
             self::assertSame($statements[$position]->sql, $pooled[$position]->sql);
             foreach ($pooled as $index => $statement) {
                 if ($index !== $position) {
-                    self::assertSame($cell->statements()[$index]->divergent, $statement->divergent);
+                    self::assertSame($cell->statements()[$index]->divergence->includesText(), $statement->divergence->includesText());
                 }
             }
         });
     }
 
-    public function testDivergenceFromAnyBlockStaysSticky(): void
+    public function testTextDivergenceFromAnyBlockStaysSticky(): void
     {
-        // A statement flagged divergent in ANY block must stay flagged in the
-        // pooled view, whichever block carries the flag.
+        // A position whose SQL varied in ANY block stays text-divergent in
+        // the pooled view, whichever block carries the flag.
         $this->forAll(DomainGenerators::cellResult(), Generator\bool())->then(function (CellResult $cell, bool $flagOnLaterBlock): void {
-            $unflagged = self::withAllDivergentFlags(cell: $cell, divergent: false);
-            $laterBlock = self::blockAfter(cell: $cell, statements: self::statementsWithDivergentFlags(statements: $cell->blocks[0]->statements, divergent: $flagOnLaterBlock));
-            $earlier = $flagOnLaterBlock ? $unflagged : self::withAllDivergentFlags(cell: $cell, divergent: true);
+            $unflagged = self::withTextDivergence(cell: $cell, textDiffers: false);
+            $laterBlock = self::blockAfter(cell: $cell, statements: self::statementsWithTextDivergence(statements: $cell->blocks[0]->statements, textDiffers: $flagOnLaterBlock));
+            $earlier = $flagOnLaterBlock ? $unflagged : self::withTextDivergence(cell: $cell, textDiffers: true);
 
             $merged = $earlier->merge(self::withBlocks(cell: $cell, blocks: [$laterBlock]));
 
             foreach ($merged->statements() as $statement) {
-                self::assertTrue($statement->divergent);
+                self::assertTrue($statement->divergence->includesText());
             }
         });
     }
@@ -343,9 +376,29 @@ final class CellResultPropertyTest extends PropertyTestCase
                     0,
                     'statements',
                     0,
-                    'divergent',
+                    'observed',
                 ],
-                'yes',
+                'all',
+            ],
+            [
+                [
+                    'blocks',
+                    0,
+                    'statements',
+                    0,
+                    'divergence',
+                ],
+                true,
+            ],
+            [
+                [
+                    'blocks',
+                    0,
+                    'statements',
+                    0,
+                    'divergence',
+                ],
+                'sometimes',
             ],
         ];
 
@@ -439,7 +492,7 @@ final class CellResultPropertyTest extends PropertyTestCase
         );
     }
 
-    private static function withAllDivergentFlags(CellResult $cell, bool $divergent): CellResult
+    private static function withTextDivergence(CellResult $cell, bool $textDiffers): CellResult
     {
         $blocks = [];
         foreach ($cell->blocks as $block) {
@@ -448,14 +501,18 @@ final class CellResultPropertyTest extends PropertyTestCase
                 executionOrder: $block->executionOrder,
                 warmupIterations: $block->warmupIterations,
                 wallSamples: $block->wallSamples,
-                statements: self::statementsWithDivergentFlags(statements: $block->statements, divergent: $divergent),
+                statements: self::statementsWithTextDivergence(statements: $block->statements, textDiffers: $textDiffers),
             );
         }
 
         return self::withBlocks(cell: $cell, blocks: $blocks);
     }
 
-    private static function statementsWithDivergentFlags(StatementProfileCollection $statements, bool $divergent): StatementProfileCollection
+    /**
+     * Sets the text flag on every position, keeping each position's own
+     * presence divergence.
+     */
+    private static function statementsWithTextDivergence(StatementProfileCollection $statements, bool $textDiffers): StatementProfileCollection
     {
         $flagged = [];
         foreach ($statements as $statement) {
@@ -463,7 +520,8 @@ final class CellResultPropertyTest extends PropertyTestCase
                 index: $statement->index,
                 sql: $statement->sql,
                 durationSamples: $statement->durationSamples,
-                divergent: $divergent,
+                observed: $statement->observed,
+                divergence: StatementDivergence::fromFlags(textDiffers: $textDiffers, intermittent: $statement->divergence->includesPresence()),
             );
         }
 

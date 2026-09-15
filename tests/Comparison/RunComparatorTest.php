@@ -23,6 +23,7 @@ use Dan\Harness\RunStore\Artifact\StatementProfileCollection;
 use Dan\Harness\RunStore\Filesystem\RunDirectory;
 use Dan\Lib\Filesystem\Path;
 use Dan\Lib\Protocol\ScenarioName;
+use Dan\Lib\Protocol\StatementDivergence;
 use Dan\Lib\Protocol\Tier;
 use DateTimeImmutable;
 use FilesystemIterator;
@@ -213,7 +214,7 @@ final class RunComparatorTest extends TestCase
                 warmupIterations: 1,
                 wallSamples: SampleCollection::fromArray($blockWallNs),
                 statements: StatementProfileCollection::create([
-                    new StatementProfile(index: 0, sql: $sql, durationSamples: SampleCollection::fromArray($blockWallNs), divergent: false),
+                    new StatementProfile(index: 0, sql: $sql, durationSamples: SampleCollection::fromArray($blockWallNs), observed: count($blockWallNs), divergence: StatementDivergence::None),
                 ]),
             );
         }

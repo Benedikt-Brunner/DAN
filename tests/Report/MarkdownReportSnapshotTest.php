@@ -7,6 +7,7 @@ namespace Dan\Harness\Tests\Report;
 use Dan\Harness\Comparison\BlockComparison;
 use Dan\Harness\Comparison\CellComparison;
 use Dan\Harness\Comparison\RunComparison;
+use Dan\Harness\Comparison\StatementInstability;
 use Dan\Harness\Gate\Policy;
 use Dan\Harness\Gate\Violation;
 use Dan\Harness\Implementation\Identity\Identity;
@@ -14,12 +15,14 @@ use Dan\Harness\Implementation\Reference\ReferenceType;
 use Dan\Harness\Measurement\Result\LatencyDelta;
 use Dan\Harness\Measurement\Result\MedianShift;
 use Dan\Harness\Measurement\Result\SampleCollection;
+use Dan\Harness\Measurement\Scheduling\RunSlot;
 use Dan\Harness\Protocol\DatabaseTarget;
 use Dan\Harness\Protocol\Engine;
 use Dan\Harness\Protocol\Protocol;
 use Dan\Harness\Report\MarkdownReportRenderer;
 use Dan\Harness\RunStore\Artifact\RunManifest;
 use Dan\Lib\Protocol\ScenarioName;
+use Dan\Lib\Protocol\StatementDivergence;
 use Dan\Lib\Protocol\Tier;
 use Dan\Lib\Time\Duration;
 use DateTimeImmutable;
@@ -119,7 +122,10 @@ final class MarkdownReportSnapshotTest extends TestCase
             ], p95Ms: [
                 3.4,
                 3.5,
-            ], divergent: true),
+            ], unstableStatements: [
+                new StatementInstability(slot: RunSlot::Baseline, index: 3, divergence: StatementDivergence::Presence, observed: 5, iterations: 30),
+                new StatementInstability(slot: RunSlot::Candidate, index: 1, divergence: StatementDivergence::Text, observed: 30, iterations: 30),
+            ]),
         ];
 
         $regressionCells = [
@@ -229,6 +235,7 @@ final class MarkdownReportSnapshotTest extends TestCase
      * @param array{float, float} $p95Ms baseline and candidate p95 wall time
      * @param list<int> $changedIndices
      * @param array{int, int} $statementCounts
+     * @param list<StatementInstability> $unstableStatements
      * @param list<array{float, float}>|null $blockMedianMs baseline and candidate median per mirrored block pair; defaults to two pairs at the cell medians
      */
     private static function cell(
@@ -242,7 +249,7 @@ final class MarkdownReportSnapshotTest extends TestCase
             4,
             4,
         ],
-        bool $divergent = false,
+        array $unstableStatements = [],
         ?array $blockMedianMs = null,
     ): CellComparison {
         $blocks = [];
@@ -282,7 +289,7 @@ final class MarkdownReportSnapshotTest extends TestCase
             // small deltas in these fixtures straddle zero, narrow enough
             // that the injected regression stays significant.
             wallShift: new MedianShift(estimatePct: $estimatePct, lowerPct: $estimatePct - 2.0, upperPct: $estimatePct + 2.0, confidence: 0.95, resamples: 1000),
-            divergent: $divergent,
+            unstableStatements: $unstableStatements,
             blocks: $blocks,
         );
     }
