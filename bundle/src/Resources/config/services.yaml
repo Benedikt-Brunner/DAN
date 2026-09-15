@@ -28,6 +28,7 @@ services:
         public: true
         factory: ['Dan\Probe\Recorder\RecordingBootstrap', 'recorder']
     Dan\Probe\Execution\Measurement\ScenarioMeasurer: ~
+    Dan\Probe\Execution\Measurement\QueryPlanCapture: ~
     Dan\Probe\Execution\Result\ScenarioResultWriter: ~
 
     # Shopware's EntityCompilerPass creates dan_synthetic_blob.repository from

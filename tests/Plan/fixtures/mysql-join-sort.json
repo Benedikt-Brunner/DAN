@@ -1,0 +1,103 @@
+{
+    "query_block": {
+        "select_id": 1,
+        "cost_info": {
+            "query_cost": "227.50"
+        },
+        "ordering_operation": {
+            "using_temporary_table": true,
+            "using_filesort": true,
+            "nested_loop": [
+                {
+                    "table": {
+                        "table_name": "product",
+                        "access_type": "range",
+                        "possible_keys": [
+                            "idx_stock"
+                        ],
+                        "key": "idx_stock",
+                        "used_key_parts": [
+                            "stock"
+                        ],
+                        "key_length": "4",
+                        "rows_examined_per_scan": 900,
+                        "rows_produced_per_join": 89,
+                        "filtered": "10.00",
+                        "index_condition": "((`dan`.`product`.`version_id` = <cache>(unhex('0fa91ce3e96a4bc2be4bd9ce752c3425'))) and (`dan`.`product`.`stock` >= 10))",
+                        "cost_info": {
+                            "read_cost": "96.75",
+                            "eval_cost": "9.00",
+                            "prefix_cost": "105.75",
+                            "data_read_per_join": "28K"
+                        },
+                        "used_columns": [
+                            "id",
+                            "version_id",
+                            "tax_id",
+                            "stock"
+                        ]
+                    }
+                },
+                {
+                    "table": {
+                        "table_name": "product.tax",
+                        "access_type": "ALL",
+                        "possible_keys": [
+                            "PRIMARY"
+                        ],
+                        "rows_examined_per_scan": 3,
+                        "rows_produced_per_join": 269,
+                        "filtered": "100.00",
+                        "using_join_buffer": "hash join",
+                        "cost_info": {
+                            "read_cost": "0.25",
+                            "eval_cost": "27.00",
+                            "prefix_cost": "133.00",
+                            "data_read_per_join": "276K"
+                        },
+                        "used_columns": [
+                            "id",
+                            "tax_rate"
+                        ],
+                        "attached_condition": "<if>(is_not_null_compl(product.tax), (`dan`.`product.tax`.`id` = `dan`.`product`.`tax_id`), true)"
+                    }
+                },
+                {
+                    "table": {
+                        "table_name": "product.translation",
+                        "access_type": "ref",
+                        "possible_keys": [
+                            "PRIMARY"
+                        ],
+                        "key": "PRIMARY",
+                        "used_key_parts": [
+                            "product_id",
+                            "language_id"
+                        ],
+                        "key_length": "32",
+                        "ref": [
+                            "dan.product.id",
+                            "const"
+                        ],
+                        "rows_examined_per_scan": 1,
+                        "rows_produced_per_join": 269,
+                        "filtered": "100.00",
+                        "using_index": true,
+                        "cost_info": {
+                            "read_cost": "67.50",
+                            "eval_cost": "27.00",
+                            "prefix_cost": "227.50",
+                            "data_read_per_join": "286K"
+                        },
+                        "used_columns": [
+                            "product_id",
+                            "product_version_id",
+                            "language_id"
+                        ],
+                        "attached_condition": "<if>(is_not_null_compl(product.translation), (`dan`.`product.translation`.`language_id` = <cache>(unhex('2fbb5fe2e29a4d70aa5854ce7ce3e20b'))), true)"
+                    }
+                }
+            ]
+        }
+    }
+}

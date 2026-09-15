@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Dan\Probe\Tests\Execution\Result;
 
+use Dan\Lib\Protocol\PlanCapture;
 use Dan\Lib\Protocol\ResultSet;
 use Dan\Lib\Protocol\StatementDivergence;
+use Dan\Probe\Execution\Result\CapturedPlan;
 use Dan\Probe\Execution\Result\ScenarioResult;
 use Dan\Probe\Execution\Result\StatementResult;
 use PHPUnit\Framework\TestCase;
@@ -48,6 +50,17 @@ final class ScenarioResultContractTest extends TestCase
                     ],
                     observed: 3,
                     divergence: StatementDivergence::None,
+                    plan: new CapturedPlan(capture: PlanCapture::Captured, plan: [
+                        'query_block' => [
+                            'select_id' => 1,
+                            'table' => [
+                                'table_name' => 'product',
+                                'access_type' => 'range',
+                                'key' => 'PRIMARY',
+                                'rows_examined_per_scan' => 3,
+                            ],
+                        ],
+                    ]),
                 ),
                 new StatementResult(
                     index: 1,
@@ -59,6 +72,7 @@ final class ScenarioResultContractTest extends TestCase
                     ],
                     observed: 2,
                     divergence: StatementDivergence::TextAndPresence,
+                    plan: CapturedPlan::unsupported(),
                 ),
             ],
         );

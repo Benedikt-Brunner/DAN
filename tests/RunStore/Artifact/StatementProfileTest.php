@@ -99,6 +99,7 @@ final class StatementProfileTest extends TestCase
             durationSamples: SampleCollection::fromArray($samples),
             observed: $observed,
             divergence: $divergence,
+            plan: null,
         );
     }
 }

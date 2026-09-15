@@ -246,6 +246,7 @@ final class CellResultTest extends TestCase
                     ],
                     'observed' => 2,
                     'divergence' => 'none',
+                    'plan' => null,
                 ],
             ],
         ];
@@ -253,7 +254,7 @@ final class CellResultTest extends TestCase
 
     private static function block(int $warmup = 2, int $iterations = 2): MeasurementBlock
     {
-        return new MeasurementBlock(slot: RunSlot::Baseline, warmupIterations: $warmup, iterations: $iterations, blockIndex: 1, executionOrder: 3);
+        return new MeasurementBlock(slot: RunSlot::Baseline, warmupIterations: $warmup, iterations: $iterations, blockIndex: 1, executionOrder: 3, capturePlans: true);
     }
 
     private static function database(): DatabaseTarget

@@ -37,6 +37,7 @@ final class ExecuteScenariosCommand extends Command
             ->addOption('iterations', null, InputOption::VALUE_REQUIRED, 'Measured iterations per scenario.', '10')
             ->addOption('warmup', null, InputOption::VALUE_REQUIRED, 'Warmup iterations per scenario (recorded SQL is kept, timings are discarded).', '0')
             ->addOption('filter', null, InputOption::VALUE_REQUIRED, 'Scenario name filter (substring match).')
+            ->addOption('capture-plans', null, InputOption::VALUE_NONE, 'After timing, capture the query plan (EXPLAIN FORMAT=JSON) of every recorded statement.')
             ->addOption('output-dir', null, InputOption::VALUE_REQUIRED, 'Absolute directory to write one JSON result file per scenario. Must be absolute: this command runs with the DAL runtime as working directory.');
     }
 
@@ -68,6 +69,7 @@ final class ExecuteScenariosCommand extends Command
         $outputDirectory = AbsolutePath::fromString($outputDir);
         $filter = $input->getOption('filter');
         $filter = is_string($filter) ? $filter : null;
+        $capturePlans = (bool) $input->getOption('capture-plans');
 
         $context = Context::createDefaultContext();
 
@@ -78,6 +80,7 @@ final class ExecuteScenariosCommand extends Command
                 context: $context,
                 warmup: $warmup,
                 iterations: $iterations,
+                capturePlans: $capturePlans,
             );
             $this->resultWriter->write(outputDirectory: $outputDirectory, result: $result);
         }

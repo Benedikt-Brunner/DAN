@@ -12,6 +12,7 @@ use Dan\Harness\Environment\HostMachine;
 use Dan\Harness\Implementation\Identity\Identity;
 use Dan\Harness\Implementation\Reference\ReferenceType;
 use Dan\Harness\Measurement\Result\SampleCollection;
+use Dan\Harness\Plan\QueryPlan;
 use Dan\Harness\Protocol\DatabaseTarget;
 use Dan\Harness\Protocol\Engine;
 use Dan\Harness\Protocol\Protocol;
@@ -21,6 +22,7 @@ use Dan\Harness\RunStore\Artifact\CellResult;
 use Dan\Harness\RunStore\Artifact\RunManifest;
 use Dan\Harness\RunStore\Artifact\StatementProfile;
 use Dan\Harness\RunStore\Artifact\StatementProfileCollection;
+use Dan\Lib\Protocol\PlanCapture;
 use Dan\Lib\Protocol\ResultSet;
 use Dan\Lib\Protocol\ScenarioName;
 use Dan\Lib\Protocol\StatementDivergence;
@@ -128,6 +130,7 @@ final class DomainGenerators
         return self::boundedList(elements: Generator\tuple(
             Generator\elements(...self::SQL_SHAPES),
             Generator\bool(),
+            Generator\elements(null, ...PlanCapture::cases()),
         ), maxLength: 6);
     }
 
@@ -549,6 +552,7 @@ final class DomainGenerators
                 durationSamples: SampleCollection::fromArray($durations),
                 observed: count($durations),
                 divergence: StatementDivergence::fromFlags(textDiffers: self::asBool($parts[1]), intermittent: $missing > 0),
+                plan: self::buildQueryPlan(capture: $parts[2], index: $index),
             );
         }
 
@@ -584,6 +588,32 @@ final class DomainGenerators
             database: self::asDatabaseTarget($head[2]),
             blocks: BlockResultCollection::inExecutionOrder($results),
         );
+    }
+
+    /**
+     * A plan for the position, or none when the block did not capture plans.
+     * Captured plans carry a small MySQL-shaped raw object.
+     */
+    private static function buildQueryPlan(mixed $capture, int $index): ?QueryPlan
+    {
+        if ($capture === null) {
+            return null;
+        }
+        if (!$capture instanceof PlanCapture) {
+            throw new LogicException('Generated value is not a PlanCapture.');
+        }
+
+        return new QueryPlan(capture: $capture, raw: $capture === PlanCapture::Captured ? [
+            'query_block' => [
+                'select_id' => 1,
+                'table' => [
+                    'table_name' => 'product',
+                    'access_type' => 'ref',
+                    'key' => 'PRIMARY',
+                    'rows_examined_per_scan' => $index + 1,
+                ],
+            ],
+        ] : null);
     }
 
     /**

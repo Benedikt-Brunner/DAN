@@ -1,0 +1,36 @@
+{
+    "query_block": {
+        "select_id": 1,
+        "cost_info": {
+            "query_cost": "0.91"
+        },
+        "table": {
+            "table_name": "product",
+            "access_type": "range",
+            "possible_keys": [
+                "PRIMARY"
+            ],
+            "key": "PRIMARY",
+            "used_key_parts": [
+                "id",
+                "version_id"
+            ],
+            "key_length": "32",
+            "rows_examined_per_scan": 2,
+            "rows_produced_per_join": 2,
+            "filtered": "100.00",
+            "using_index": true,
+            "cost_info": {
+                "read_cost": "0.71",
+                "eval_cost": "0.20",
+                "prefix_cost": "0.91",
+                "data_read_per_join": "640"
+            },
+            "used_columns": [
+                "id",
+                "version_id"
+            ],
+            "attached_condition": "((`dan`.`product`.`version_id` = <cache>(unhex('0fa91ce3e96a4bc2be4bd9ce752c3425'))) and (`dan`.`product`.`id` in (<cache>(unhex(lpad(hex(1),32,'0'))),<cache>(unhex(lpad(hex(2),32,'0'))))))"
+        }
+    }
+}
