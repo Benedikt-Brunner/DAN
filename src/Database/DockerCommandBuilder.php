@@ -22,11 +22,20 @@ final class DockerCommandBuilder
         private ?Duration $timeout = null,
     ) {}
 
-    public static function startDatabase(DatabaseTarget $target, string $containerName, int $hostPort, string $rootPassword): self
+    private const string DATA_DIRECTORY = '/var/lib/mysql';
+    private const string SNAPSHOT_MOUNT = '/snapshot';
+
+    /**
+     * Starts the server with its data directory on the instance's named
+     * volume. An empty volume makes the image's entrypoint initialise a fresh
+     * database with the given credentials; a volume restored from a snapshot
+     * already holds one, and the entrypoint skips initialisation.
+     */
+    public static function startDatabase(DatabaseInstance $instance, string $rootPassword): self
     {
-        self::validateContainerName($containerName);
-        if ($hostPort < 1 || $hostPort > 65535) {
-            throw new InvalidArgumentException(sprintf('Invalid TCP port %d.', $hostPort));
+        self::validateContainerName($instance->containerName);
+        if ($instance->hostPort < 1 || $instance->hostPort > 65535) {
+            throw new InvalidArgumentException(sprintf('Invalid TCP port %d.', $instance->hostPort));
         }
 
         return new self([
@@ -35,7 +44,7 @@ final class DockerCommandBuilder
             '--detach',
             '--rm',
             '--name',
-            $containerName,
+            $instance->containerName,
             '--env',
             'MYSQL_ROOT_PASSWORD=' . $rootPassword,
             '--env',
@@ -44,9 +53,11 @@ final class DockerCommandBuilder
             'MARIADB_ROOT_PASSWORD=' . $rootPassword,
             '--env',
             'MARIADB_DATABASE=dan',
+            '--volume',
+            $instance->dataVolume() . ':' . self::DATA_DIRECTORY,
             '--publish',
-            sprintf('127.0.0.1:%d:3306', $hostPort),
-            self::getImageIdentifier($target),
+            sprintf('127.0.0.1:%d:3306', $instance->hostPort),
+            self::getImageIdentifier($instance->target),
         ]);
     }
 
@@ -98,48 +109,80 @@ final class DockerCommandBuilder
         ]);
     }
 
-    public static function stopDatabase(DatabaseInstance $instance): self
+    /**
+     * SIGTERM, then the grace period for mysqld to flush and close cleanly -
+     * a snapshot taken from the volume afterwards is crash-consistent only if
+     * the shutdown completed. The container removes itself; the volume stays.
+     */
+    public static function stopDatabase(DatabaseInstance $instance, Duration $gracePeriod): self
     {
         self::validateContainerName($instance->containerName);
 
         return new self([
             'docker',
             'stop',
+            '--time',
+            (string) (int) ceil($gracePeriod->toSecondsFloat()),
             '--',
             $instance->containerName,
         ]);
     }
 
-    public static function importDatabase(DatabaseInstance $instance, Path $dumpPath, string $rootPassword): self
+    public static function createVolume(DatabaseInstance $instance): self
     {
-        return self::databaseClient(
-            instance: $instance,
-            rootPassword: $rootPassword,
-            clientArguments: [],
-            inputPath: $dumpPath,
-        );
+        self::validateContainerName($instance->dataVolume());
+
+        return new self([
+            'docker',
+            'volume',
+            'create',
+            '--',
+            $instance->dataVolume(),
+        ]);
     }
 
-    public static function dumpDatabase(DatabaseInstance $instance, Path $dumpPath, string $rootPassword): self
+    public static function removeVolume(DatabaseInstance $instance): self
     {
-        self::validateContainerName($instance->containerName);
+        self::validateContainerName($instance->dataVolume());
 
-        return new self(
-            arguments: [
-                'docker',
-                'exec',
-                '--',
-                $instance->containerName,
-                $instance->dumpBinary(),
-                '-uroot',
-                '-p' . $rootPassword,
-                '--single-transaction',
-                '--routines',
-                '--triggers',
-                'dan',
-            ],
-            outputPath: $dumpPath,
-        );
+        return new self([
+            'docker',
+            'volume',
+            'rm',
+            '--force',
+            '--',
+            $instance->dataVolume(),
+        ]);
+    }
+
+    /**
+     * Archives the stopped server's data directory into the snapshot file.
+     * Runs tar from the database image itself so no helper image has to be
+     * pulled; the snapshot's directory is bind-mounted, the file named inside.
+     */
+    public static function archiveDataDirectory(DatabaseInstance $instance, Path $snapshotPath): self
+    {
+        return self::dataDirectoryTar(instance: $instance, snapshotPath: $snapshotPath, tarArguments: [
+            '-czf',
+            self::SNAPSHOT_MOUNT . '/' . $snapshotPath->basename(),
+            '-C',
+            self::DATA_DIRECTORY,
+            '.',
+        ], readOnlyVolume: true);
+    }
+
+    /**
+     * Unpacks a snapshot into the instance's (empty) data volume before the
+     * server is started on it.
+     */
+    public static function restoreDataDirectory(DatabaseInstance $instance, Path $snapshotPath): self
+    {
+        return self::dataDirectoryTar(instance: $instance, snapshotPath: $snapshotPath, tarArguments: [
+            '-xzf',
+            self::SNAPSHOT_MOUNT . '/' . $snapshotPath->basename(),
+            '-C',
+            self::DATA_DIRECTORY,
+        ], readOnlyVolume: false);
     }
 
     public static function probeDatabase(DatabaseInstance $instance, string $rootPassword): self
@@ -177,6 +220,31 @@ final class DockerCommandBuilder
             inputPath: $this->inputPath,
             outputPath: $this->outputPath,
         );
+    }
+
+    /**
+     * @param list<string> $tarArguments
+     */
+    private static function dataDirectoryTar(DatabaseInstance $instance, Path $snapshotPath, array $tarArguments, bool $readOnlyVolume): self
+    {
+        self::validateContainerName($instance->dataVolume());
+        if (str_contains($snapshotPath->basename(), ':') || str_starts_with($snapshotPath->basename(), '-')) {
+            throw new InvalidArgumentException(sprintf('Invalid snapshot file name "%s".', $snapshotPath->basename()));
+        }
+
+        return new self([
+            'docker',
+            'run',
+            '--rm',
+            '--entrypoint',
+            'tar',
+            '--volume',
+            $instance->dataVolume() . ':' . self::DATA_DIRECTORY . ($readOnlyVolume ? ':ro' : ''),
+            '--volume',
+            $snapshotPath->parent()->toString() . ':' . self::SNAPSHOT_MOUNT,
+            self::getImageIdentifier($instance->target),
+            ...$tarArguments,
+        ]);
     }
 
     /**
