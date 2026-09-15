@@ -25,6 +25,7 @@ final class RunManifestTest extends TestCase
                 databases: [],
                 tiers: [],
                 warmupIterations: 5,
+                blockWarmupIterations: 2,
                 measuredIterations: 30,
                 blocks: 4,
                 scenarioFilter: null,

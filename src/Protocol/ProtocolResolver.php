@@ -17,6 +17,7 @@ final class ProtocolResolver
         array $databaseSpecs,
         array $tiers,
         int $warmupIterations,
+        int $blockWarmupIterations,
         int $measuredIterations,
         int $blocks,
         ?string $scenarioFilter,
@@ -37,6 +38,9 @@ final class ProtocolResolver
         if ($warmupIterations < 0) {
             throw new InvalidArgumentException('--warmup must be zero or more.');
         }
+        if ($blockWarmupIterations < 0) {
+            throw new InvalidArgumentException('--block-warmup must be zero or more.');
+        }
         if ($blocks < 1) {
             throw new InvalidArgumentException('--blocks must be at least 1.');
         }
@@ -48,6 +52,7 @@ final class ProtocolResolver
             databases: array_map(DatabaseTarget::fromString(...), array_values($databaseSpecs)),
             tiers: $resolvedTiers,
             warmupIterations: $warmupIterations,
+            blockWarmupIterations: $blockWarmupIterations,
             measuredIterations: $measuredIterations,
             blocks: $blocks,
             scenarioFilter: $scenarioFilter,

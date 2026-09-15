@@ -6,7 +6,7 @@
 | Identity | `baseline-cccccccc` | `candidate-ccccccc` |
 | Recorded | 2026-08-20 10:00:00 GMT+0000 | 2026-08-20 10:20:00 GMT+0000 |
 
-Protocol: 5 warmup + 30 measured iterations in 4 blocks.
+Protocol: 5 warmup + 30 measured iterations in 4 blocks, 2 warmup at the start of every block.
 
 ## Gate violations
 

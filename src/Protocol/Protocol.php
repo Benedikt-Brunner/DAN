@@ -13,12 +13,20 @@ use RuntimeException;
  * so every profile is self-describing, and diffs across mismatched protocols
  * can be detected and refused.
  *
+ * Two different things get warmed up, and the protocol names both:
+ * warmupIterations runs once per implementation per grid cell (dataset and
+ * buffer-pool warmth, which the persistent database container keeps across
+ * blocks), blockWarmupIterations runs at the start of every measurement
+ * block (process and connection warmth - each block is a fresh dan:execute
+ * process with a cold kernel, connection and statement handles).
+ *
  * @phpstan-import-type DatabaseTargetPayload from DatabaseTarget
  *
  * @phpstan-type ProtocolPayload array{
  *     databases: list<DatabaseTargetPayload>,
  *     tiers: list<string>,
  *     warmupIterations: int,
+ *     blockWarmupIterations: int,
  *     measuredIterations: int,
  *     blocks: int,
  *     scenarioFilter: string|null
@@ -34,6 +42,7 @@ final class Protocol
         public readonly array $databases,
         public readonly array $tiers,
         public readonly int $warmupIterations,
+        public readonly int $blockWarmupIterations,
         public readonly int $measuredIterations,
         public readonly int $blocks,
         public readonly ?string $scenarioFilter,
@@ -51,6 +60,7 @@ final class Protocol
             'databases' => array_map(fn (DatabaseTarget $db) => $db->toArray(), $this->databases),
             'tiers' => array_map(fn (Tier $tier) => $tier->value, $this->tiers),
             'warmupIterations' => $this->warmupIterations,
+            'blockWarmupIterations' => $this->blockWarmupIterations,
             'measuredIterations' => $this->measuredIterations,
             'blocks' => $this->blocks,
             'scenarioFilter' => $this->scenarioFilter,
@@ -69,6 +79,7 @@ final class Protocol
                 $payload['tiers'],
             ),
             warmupIterations: $payload['warmupIterations'],
+            blockWarmupIterations: $payload['blockWarmupIterations'],
             measuredIterations: $payload['measuredIterations'],
             blocks: $payload['blocks'],
             scenarioFilter: $payload['scenarioFilter'],
@@ -83,6 +94,7 @@ final class Protocol
         $databasePayloads = $payload['databases'] ?? null;
         $tierPayloads = $payload['tiers'] ?? null;
         $warmupIterations = $payload['warmupIterations'] ?? null;
+        $blockWarmupIterations = $payload['blockWarmupIterations'] ?? null;
         $measuredIterations = $payload['measuredIterations'] ?? null;
         $blocks = $payload['blocks'] ?? null;
         $scenarioFilter = $payload['scenarioFilter'] ?? null;
@@ -92,6 +104,7 @@ final class Protocol
             || !is_array($tierPayloads)
             || !array_is_list($tierPayloads)
             || !is_int($warmupIterations)
+            || !is_int($blockWarmupIterations)
             || !is_int($measuredIterations)
             || !is_int($blocks)
             || ($scenarioFilter !== null && !is_string($scenarioFilter))
@@ -118,6 +131,7 @@ final class Protocol
             databases: $databases,
             tiers: $tiers,
             warmupIterations: $warmupIterations,
+            blockWarmupIterations: $blockWarmupIterations,
             measuredIterations: $measuredIterations,
             blocks: $blocks,
             scenarioFilter: $scenarioFilter,

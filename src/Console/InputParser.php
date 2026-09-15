@@ -25,6 +25,7 @@ final class InputParser
             databaseSpecs: $this->stringList(input: $input, name: 'db'),
             tiers: $this->stringList(input: $input, name: 'tier'),
             warmupIterations: $this->int(input: $input, name: 'warmup'),
+            blockWarmupIterations: $this->int(input: $input, name: 'block-warmup'),
             measuredIterations: $this->int(input: $input, name: 'iterations'),
             blocks: $this->int(input: $input, name: 'blocks'),
             scenarioFilter: $this->nullableString(input: $input, name: 'filter'),

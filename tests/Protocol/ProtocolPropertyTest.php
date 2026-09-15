@@ -96,6 +96,10 @@ final class ProtocolPropertyTest extends PropertyTestCase
                 'five',
             ],
             [
+                ['blockWarmupIterations'],
+                2.0,
+            ],
+            [
                 ['measuredIterations'],
                 null,
             ],

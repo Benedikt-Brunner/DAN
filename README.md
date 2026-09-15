@@ -14,7 +14,7 @@ Generation *time* is explicitly out of scope — producing the SQL is never the 
 - **Live per cell, no record-and-replay.** The DAL executes every scenario live against every grid cell; the SQL is captured as an *artifact* of the cell. Replay would lie: DAL reads are data-dependent multi-statement sequences (searcher ids feed the reader query), and the DAL emits engine-dependent SQL in places (MySQL vs MariaDB JSON paths).
 - **Checkout-first.** Point `--dal` at a local `shopware/shopware` checkout (its `src/Core` contents are fingerprinted, including uncommitted and untracked files), or at a released version for baselines.
 - **Datasets are seeded through the DAL under test** (deterministic ids, fixed data, idempotent upserts) and snapshotted into a cache keyed by `(DAL fingerprint × tier × engine × seeder version)`. Tiers: S / M / L. The snapshot cache is load-bearing — L-tier seeding takes hours and must happen at most once per implementation.
-- **Latency is the headline metric, warm-cache only.** Fixed warmup, then N measured iterations, median + p95. Noise control is mandatory: A/B runs measure both implementations **within one session** in mirrored alternating blocks (`A,B / B,A / …`), each implementation against its **own isolated database container**. Latency numbers are never compared across CI jobs — GitHub-hosted runner VMs are not comparable to each other.
+- **Latency is the headline metric, warm-cache only.** Fixed warmup per cell, a small warmup at the start of every measurement block (each block is a fresh probe process), then N measured iterations, median + p95. Noise control is mandatory: A/B runs measure both implementations **within one session** in mirrored alternating blocks (`A,B / B,A / …`), each implementation against its **own isolated database container**. Latency numbers are never compared across CI jobs — GitHub-hosted runner VMs are not comparable to each other.
 - **Protocols are frozen into run manifests.** The matrix is chosen via CLI flags, but every profile records its fully-resolved protocol; `dan diff` refuses protocol-mismatched comparisons unless overridden.
 
 ## Usage
@@ -28,7 +28,7 @@ bin/dan run \
   --dal ../shopware \
   --db mysql:8.0 --db mariadb:11.4 \
   --tier S --tier M \
-  --iterations 30 --warmup 5 --blocks 4
+  --iterations 30 --warmup 5 --block-warmup 2 --blocks 4
 
 # Single-implementation profile
 bin/dan run --dal ../shopware --db mysql:8.0 --tier S
