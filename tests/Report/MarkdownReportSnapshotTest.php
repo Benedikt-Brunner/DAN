@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace Dan\Harness\Tests\Report;
 
+use Dan\Harness\Comparison\AlignedStatement;
+use Dan\Harness\Comparison\AlignmentKind;
 use Dan\Harness\Comparison\BlockComparison;
 use Dan\Harness\Comparison\CellComparison;
 use Dan\Harness\Comparison\RunComparison;
+use Dan\Harness\Comparison\StatementAlignment;
 use Dan\Harness\Comparison\StatementInstability;
 use Dan\Harness\Gate\Policy;
 use Dan\Harness\Gate\Violation;
@@ -218,6 +221,35 @@ final class MarkdownReportSnapshotTest extends TestCase
         );
     }
 
+    /**
+     * Positions in $changedIndices are modifications, every other shared
+     * position is unchanged, and statements beyond the shorter sequence are
+     * insertions (candidate longer) or removals (baseline longer).
+     *
+     * @param array{int, int} $statementCounts
+     * @param list<int> $changedIndices
+     */
+    private static function alignment(array $statementCounts, array $changedIndices): StatementAlignment
+    {
+        $items = [];
+        $shared = min($statementCounts[0], $statementCounts[1]);
+        for ($index = 0; $index < $shared; ++$index) {
+            $items[] = new AlignedStatement(
+                kind: in_array($index, $changedIndices, true) ? AlignmentKind::Modified : AlignmentKind::Unchanged,
+                baselineIndex: $index,
+                candidateIndex: $index,
+            );
+        }
+        for ($index = $shared; $index < $statementCounts[0]; ++$index) {
+            $items[] = new AlignedStatement(kind: AlignmentKind::Removed, baselineIndex: $index, candidateIndex: null);
+        }
+        for ($index = $shared; $index < $statementCounts[1]; ++$index) {
+            $items[] = new AlignedStatement(kind: AlignmentKind::Inserted, baselineIndex: null, candidateIndex: $index);
+        }
+
+        return new StatementAlignment($items);
+    }
+
     private static function manifest(string $id, string $label, string $recordedAt, Protocol $protocol): RunManifest
     {
         return new RunManifest(
@@ -277,8 +309,7 @@ final class MarkdownReportSnapshotTest extends TestCase
             database: $database,
             baselineStatementCount: $statementCounts[0],
             candidateStatementCount: $statementCounts[1],
-            sqlChanged: $changedIndices !== [],
-            changedStatementIndices: $changedIndices,
+            alignment: self::alignment(statementCounts: $statementCounts, changedIndices: $changedIndices),
             baselineSampleCount: 30,
             candidateSampleCount: 30,
             baselineMedianWall: $baselineMedian,

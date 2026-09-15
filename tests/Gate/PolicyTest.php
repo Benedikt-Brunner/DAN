@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Dan\Harness\Tests\Gate;
 
+use Dan\Harness\Comparison\AlignedStatement;
+use Dan\Harness\Comparison\AlignmentKind;
 use Dan\Harness\Comparison\CellComparison;
+use Dan\Harness\Comparison\StatementAlignment;
 use Dan\Harness\Gate\Policy;
 use Dan\Harness\Gate\ViolationKind;
 use Dan\Harness\Measurement\Result\MedianShift;
@@ -85,8 +88,14 @@ final class PolicyTest extends TestCase
             database: new DatabaseTarget(engine: Engine::MySql, version: '8.0'),
             baselineStatementCount: 4,
             candidateStatementCount: 4,
-            sqlChanged: $changedIndices !== [],
-            changedStatementIndices: $changedIndices,
+            alignment: new StatementAlignment(array_map(
+                fn (int $index): AlignedStatement => new AlignedStatement(
+                    kind: in_array($index, $changedIndices, true) ? AlignmentKind::Modified : AlignmentKind::Unchanged,
+                    baselineIndex: $index,
+                    candidateIndex: $index,
+                ),
+                range(0, 3),
+            )),
             baselineSampleCount: 30,
             candidateSampleCount: 30,
             baselineMedianWall: Duration::fromNs(10_000_000),

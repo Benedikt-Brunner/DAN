@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Dan\Harness\Tests\Comparison;
 
+use Dan\Harness\Comparison\AlignmentKind;
 use Dan\Harness\Comparison\RunComparator;
 use Dan\Harness\Measurement\Result\MedianShiftEstimator;
 use Dan\Harness\Measurement\Result\SampleCollection;
@@ -58,8 +59,8 @@ final class RunComparatorPropertyTest extends PropertyTestCase
                     foreach ($comparison->cells as $cell) {
                         $fileName = (new CellId(scenario: $cell->scenario, tier: $cell->tier, database: $cell->database))->fileName();
 
-                        self::assertFalse($cell->sqlChanged);
-                        self::assertSame([], $cell->changedStatementIndices);
+                        self::assertFalse($cell->sqlChanged());
+                        self::assertSame([], $cell->alignment->changes());
                         self::assertSame(0.0, $cell->wallDeltaPct());
                         self::assertFalse($cell->wallShift->excludesZero(), 'Identical runs must never look significantly different.');
                         self::assertSame($cell->baselineStatementCount, $cell->candidateStatementCount);
@@ -103,8 +104,25 @@ final class RunComparatorPropertyTest extends PropertyTestCase
                     $comparison = RunComparator::compare(baseline: $baseline, candidate: $candidate, shiftEstimator: new MedianShiftEstimator(resamples: 50));
 
                     self::assertCount(1, $comparison->cells);
-                    self::assertSame($changedPositions !== [], $comparison->cells[0]->sqlChanged);
-                    self::assertSame($changedPositions, $comparison->cells[0]->changedStatementIndices);
+                    $alignment = $comparison->cells[0]->alignment;
+                    self::assertSame($changedPositions !== [], $alignment->sqlChanged());
+                    // The candidate differs from the baseline by substitutions
+                    // only, so the alignment must pair exactly the rewritten
+                    // positions with themselves - as modified, or as ambiguous
+                    // when a repeated statement sits next to them - and leave
+                    // every other position unchanged. A drift onto another
+                    // copy of a repeated statement would fail this.
+                    $pairedPositions = [];
+                    foreach ($alignment->changes() as $change) {
+                        self::assertContains($change->kind, [
+                            AlignmentKind::Modified,
+                            AlignmentKind::Ambiguous,
+                        ]);
+                        self::assertSame($change->baselineIndex, $change->candidateIndex);
+                        $pairedPositions[] = (int) $change->baselineIndex;
+                    }
+                    self::assertSame($changedPositions, $pairedPositions);
+                    self::assertCount(count($cell->statements()) - count($changedPositions), $alignment->baselineIndices(AlignmentKind::Unchanged));
                     self::assertTrue($comparison->cells[0]->hasUnstableStatements(), 'A divergence flag on either side must surface.');
                     $unstableSlots = array_map(fn ($instability) => $instability->slot, $comparison->cells[0]->unstableStatements);
                     self::assertContains($candidateCarriesDivergence ? RunSlot::Candidate : RunSlot::Baseline, $unstableSlots);

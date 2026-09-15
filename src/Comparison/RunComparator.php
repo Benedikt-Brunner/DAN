@@ -54,16 +54,10 @@ final class RunComparator
     {
         $baselineStatements = $baselineCell->statements();
         $candidateStatements = $candidateCell->statements();
-        $normalizedBaseline = array_map(fn (StatementProfile $statement) => SqlNormalizer::normalize($statement->sql), $baselineStatements->getItems());
-        $normalizedCandidate = array_map(fn (StatementProfile $statement) => SqlNormalizer::normalize($statement->sql), $candidateStatements->getItems());
-
-        $changedIndices = [];
-        $max = max(count($normalizedBaseline), count($normalizedCandidate));
-        for ($i = 0; $i < $max; ++$i) {
-            if (($normalizedBaseline[$i] ?? null) !== ($normalizedCandidate[$i] ?? null)) {
-                $changedIndices[] = $i;
-            }
-        }
+        $alignment = StatementAligner::align(
+            baseline: array_map(fn (StatementProfile $statement) => SqlNormalizer::normalize($statement->sql), $baselineStatements->getItems()),
+            candidate: array_map(fn (StatementProfile $statement) => SqlNormalizer::normalize($statement->sql), $candidateStatements->getItems()),
+        );
 
         $baselineWall = $baselineCell->wallSamples();
         $candidateWall = $candidateCell->wallSamples();
@@ -81,8 +75,7 @@ final class RunComparator
             database: $baselineCell->database,
             baselineStatementCount: count($baselineStatements),
             candidateStatementCount: count($candidateStatements),
-            sqlChanged: $changedIndices !== [],
-            changedStatementIndices: $changedIndices,
+            alignment: $alignment,
             baselineSampleCount: count($baselineWall),
             candidateSampleCount: count($candidateWall),
             baselineMedianWall: $baselineWallStatistics->median(),

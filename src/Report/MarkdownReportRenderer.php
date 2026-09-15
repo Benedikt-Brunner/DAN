@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Dan\Harness\Report;
 
+use Dan\Harness\Comparison\AlignedStatement;
+use Dan\Harness\Comparison\AlignmentKind;
 use Dan\Harness\Comparison\BlockComparison;
 use Dan\Harness\Comparison\CellComparison;
 use Dan\Harness\Comparison\RunComparison;
@@ -176,8 +178,8 @@ final class MarkdownReportRenderer
     /** @return list<string> */
     private function formatCell(CellComparison $cell): array
     {
-        $sqlStatus = $cell->sqlChanged
-            ? sprintf(':warning: changed (%s)', implode(', ', $cell->changedStatementIndices))
+        $sqlStatus = $cell->sqlChanged()
+            ? sprintf(':warning: changed (%s)', $this->describeChanges($cell))
             : 'unchanged';
         if ($cell->hasUnstableStatements()) {
             $sqlStatus .= ' :grey_question: ' . implode('; ', array_map($this->describeInstability(...), $cell->unstableStatements));
@@ -197,6 +199,29 @@ final class MarkdownReportRenderer
             $this->formatP95(duration: $cell->baselineP95Wall, indicativeOnly: $cell->p95IsIndicativeOnly()),
             $this->formatP95(duration: $cell->candidateP95Wall, indicativeOnly: $cell->p95IsIndicativeOnly()),
         ];
+    }
+
+    /**
+     * The aligned changes with their original statement positions: ~ modified
+     * (baseline->candidate position when they differ), - removed from the
+     * baseline, + inserted in the candidate, ? ambiguous alignment.
+     */
+    private function describeChanges(CellComparison $cell): string
+    {
+        return implode(', ', array_map($this->describeChange(...), $cell->alignment->changes()));
+    }
+
+    private function describeChange(AlignedStatement $item): string
+    {
+        $positions = match (true) {
+            $item->baselineIndex !== null && $item->candidateIndex !== null => $item->baselineIndex === $item->candidateIndex
+                ? sprintf('~%d', $item->baselineIndex)
+                : sprintf('~%d->%d', $item->baselineIndex, $item->candidateIndex),
+            $item->baselineIndex !== null => sprintf('-%d', $item->baselineIndex),
+            default => sprintf('+%d', $item->candidateIndex),
+        };
+
+        return $item->kind === AlignmentKind::Ambiguous ? '?' . $positions : $positions;
     }
 
     /**
@@ -309,9 +334,9 @@ final class MarkdownReportRenderer
 
         return match ($violation->kind) {
             ViolationKind::SqlChanged => sprintf(
-                '%s: generated SQL changed (statements %s)',
+                '%s: generated SQL changed (%s)',
                 $cellName,
-                implode(', ', $cell->changedStatementIndices),
+                $this->describeChanges($cell),
             ),
             ViolationKind::WallRegression => sprintf(
                 '%s: median wall time regressed %.1f%% (%d%% interval [%+.1f%%, %+.1f%%] excludes zero; %.2fms -> %.2fms, limit %.1f%%)',
