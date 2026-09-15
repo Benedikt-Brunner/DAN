@@ -16,12 +16,14 @@ use PHPUnit\Framework\TestCase;
 
 final class DockerCommandBuilderTest extends TestCase
 {
-    public function testBuildsDatabaseStartAsAnArgumentVector(): void
+    public function testBuildsDatabaseStartAsAnArgumentVectorOnTheDataVolume(): void
     {
         $command = DockerCommandBuilder::startDatabase(
-            target: new DatabaseTarget(engine: Engine::MySql, version: '8.4'),
-            containerName: 'dan-baseline-small-mysql84',
-            hostPort: 33060,
+            instance: new DatabaseInstance(
+                containerName: 'dan-baseline-small-mysql84',
+                target: new DatabaseTarget(engine: Engine::MySql, version: '8.4'),
+                hostPort: 33060,
+            ),
             rootPassword: 'secret with spaces',
         )->withTimeout(Duration::fromSeconds(300))->build();
 
@@ -40,6 +42,8 @@ final class DockerCommandBuilderTest extends TestCase
             'MARIADB_ROOT_PASSWORD=secret with spaces',
             '--env',
             'MARIADB_DATABASE=dan',
+            '--volume',
+            'dan-baseline-small-mysql84-data:/var/lib/mysql',
             '--publish',
             '127.0.0.1:33060:3306',
             'mysql:8.4',
@@ -47,42 +51,94 @@ final class DockerCommandBuilderTest extends TestCase
         self::assertSame(300.0, $command->timeout?->toSecondsFloat());
     }
 
-    public function testImportUsesAFileAsProcessInputWithoutShellRedirection(): void
+    public function testStopGivesTheServerTimeToShutDownCleanly(): void
     {
-        $dumpPath = Path::fromString('/tmp/a dump; echo unsafe.sql');
-        $command = DockerCommandBuilder::importDatabase(
-            instance: $this->instance(),
-            dumpPath: $dumpPath,
-            rootPassword: 'dan',
-        )->build();
+        $command = DockerCommandBuilder::stopDatabase(instance: $this->instance(), gracePeriod: Duration::fromSeconds(300))->build();
 
         self::assertSame([
             'docker',
-            'exec',
-            '--interactive',
+            'stop',
+            '--time',
+            '300',
             '--',
             'dan-test',
-            'mariadb',
-            '-uroot',
-            '-pdan',
-            'dan',
         ], $command->arguments);
-        self::assertSame($dumpPath, $command->inputPath);
-        self::assertNotContains('<', $command->arguments);
     }
 
-    public function testDumpUsesAFileAsProcessOutputWithoutShellRedirection(): void
+    public function testTheDataVolumeIsNamedAfterTheContainer(): void
     {
-        $dumpPath = Path::fromString('/tmp/a dump; echo unsafe.sql');
-        $command = DockerCommandBuilder::dumpDatabase(
-            instance: $this->instance(),
-            dumpPath: $dumpPath,
-            rootPassword: 'dan',
-        )->build();
+        self::assertSame([
+            'docker',
+            'volume',
+            'create',
+            '--',
+            'dan-test-data',
+        ], DockerCommandBuilder::createVolume($this->instance())->build()->arguments);
+        self::assertSame([
+            'docker',
+            'volume',
+            'rm',
+            '--force',
+            '--',
+            'dan-test-data',
+        ], DockerCommandBuilder::removeVolume($this->instance())->build()->arguments);
+    }
 
-        self::assertSame($dumpPath, $command->outputPath);
-        self::assertNotContains('>', $command->arguments);
-        self::assertSame('mariadb-dump', $command->arguments[4]);
+    public function testArchivesTheDataDirectoryWithTarFromTheDatabaseImageItself(): void
+    {
+        $snapshot = Path::fromString('/cache/snapshots/abcd--S--mariadb-11.4.tar.gz');
+
+        $command = DockerCommandBuilder::archiveDataDirectory(instance: $this->instance(), snapshotPath: $snapshot)->build();
+
+        self::assertSame([
+            'docker',
+            'run',
+            '--rm',
+            '--entrypoint',
+            'tar',
+            '--volume',
+            'dan-test-data:/var/lib/mysql:ro',
+            '--volume',
+            '/cache/snapshots:/snapshot',
+            'mariadb:11.4',
+            '-czf',
+            '/snapshot/abcd--S--mariadb-11.4.tar.gz',
+            '-C',
+            '/var/lib/mysql',
+            '.',
+        ], $command->arguments);
+        self::assertNull($command->outputPath, 'The archive is written by tar inside the container, not through a shell redirection.');
+    }
+
+    public function testRestoresTheDataDirectoryIntoAWritableVolume(): void
+    {
+        $snapshot = Path::fromString('/cache/snapshots/abcd--S--mariadb-11.4.tar.gz');
+
+        $command = DockerCommandBuilder::restoreDataDirectory(instance: $this->instance(), snapshotPath: $snapshot)->build();
+
+        self::assertSame([
+            'docker',
+            'run',
+            '--rm',
+            '--entrypoint',
+            'tar',
+            '--volume',
+            'dan-test-data:/var/lib/mysql',
+            '--volume',
+            '/cache/snapshots:/snapshot',
+            'mariadb:11.4',
+            '-xzf',
+            '/snapshot/abcd--S--mariadb-11.4.tar.gz',
+            '-C',
+            '/var/lib/mysql',
+        ], $command->arguments);
+    }
+
+    public function testRejectsASnapshotFileNameThatCouldBeReadAsAnOption(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        DockerCommandBuilder::archiveDataDirectory(instance: $this->instance(), snapshotPath: Path::fromString('/cache/--exclude=x.tar.gz'));
     }
 
     public function testTheReadinessProbeForcesTcpSoTheInitialisationServerCannotAnswerIt(): void
@@ -116,9 +172,11 @@ final class DockerCommandBuilderTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
 
         DockerCommandBuilder::startDatabase(
-            target: new DatabaseTarget(engine: Engine::MySql, version: '8.4'),
-            containerName: $containerName,
-            hostPort: 33060,
+            instance: new DatabaseInstance(
+                containerName: $containerName,
+                target: new DatabaseTarget(engine: Engine::MySql, version: '8.4'),
+                hostPort: 33060,
+            ),
             rootPassword: 'dan',
         );
     }
@@ -128,9 +186,11 @@ final class DockerCommandBuilderTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
 
         DockerCommandBuilder::startDatabase(
-            target: new DatabaseTarget(engine: Engine::MySql, version: '--privileged'),
-            containerName: 'dan-test',
-            hostPort: 33060,
+            instance: new DatabaseInstance(
+                containerName: 'dan-test',
+                target: new DatabaseTarget(engine: Engine::MySql, version: '--privileged'),
+                hostPort: 33060,
+            ),
             rootPassword: 'dan',
         );
     }

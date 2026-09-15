@@ -15,6 +15,17 @@ final class DatabaseInstance
         public readonly int $hostPort,
     ) {}
 
+    /**
+     * The named Docker volume holding this instance's data directory. It
+     * outlives the container: a clean stop plus an archive of the volume is
+     * the snapshot, and a fresh volume restored from the archive is how a
+     * cached dataset comes back in seconds instead of an index rebuild.
+     */
+    public function dataVolume(): string
+    {
+        return $this->containerName . '-data';
+    }
+
     public function databaseUrl(): string
     {
         return sprintf('mysql://root:dan@127.0.0.1:%d/dan', $this->hostPort);
@@ -27,14 +38,6 @@ final class DatabaseInstance
         return match ($this->target->engine) {
             Engine::MariaDb => 'mariadb',
             Engine::MySql => 'mysql',
-        };
-    }
-
-    public function dumpBinary(): string
-    {
-        return match ($this->target->engine) {
-            Engine::MariaDb => 'mariadb-dump',
-            Engine::MySql => 'mysqldump',
         };
     }
 }
