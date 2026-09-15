@@ -7,9 +7,12 @@ namespace Dan\Harness\Report;
 use Dan\Harness\Comparison\BlockComparison;
 use Dan\Harness\Comparison\CellComparison;
 use Dan\Harness\Comparison\RunComparison;
+use Dan\Harness\Comparison\StatementInstability;
 use Dan\Harness\Gate\Violation;
 use Dan\Harness\Gate\ViolationKind;
+use Dan\Harness\Measurement\Scheduling\RunSlot;
 use Dan\Harness\RunStore\Artifact\RunManifest;
+use Dan\Lib\Protocol\StatementDivergence;
 use Dan\Lib\Time\Duration;
 
 /**
@@ -176,8 +179,8 @@ final class MarkdownReportRenderer
         $sqlStatus = $cell->sqlChanged
             ? sprintf(':warning: changed (%s)', implode(', ', $cell->changedStatementIndices))
             : 'unchanged';
-        if ($cell->divergent) {
-            $sqlStatus .= ' :grey_question: divergent';
+        if ($cell->hasUnstableStatements()) {
+            $sqlStatus .= ' :grey_question: ' . implode('; ', array_map($this->describeInstability(...), $cell->unstableStatements));
         }
         $delta = $this->formatShift($cell);
         if ($cell->blockEffectsDisagree()) {
@@ -194,6 +197,29 @@ final class MarkdownReportRenderer
             $this->formatP95(duration: $cell->baselineP95Wall, indicativeOnly: $cell->p95IsIndicativeOnly()),
             $this->formatP95(duration: $cell->candidateP95Wall, indicativeOnly: $cell->p95IsIndicativeOnly()),
         ];
+    }
+
+    /**
+     * Which run, which position, what kind of divergence, and the subset of
+     * iterations the position's timings actually describe.
+     */
+    private function describeInstability(StatementInstability $instability): string
+    {
+        $kind = match ($instability->divergence) {
+            StatementDivergence::Text => 'SQL varies',
+            StatementDivergence::Presence => 'intermittent',
+            StatementDivergence::TextAndPresence => 'SQL varies, intermittent',
+            StatementDivergence::None => 'stable',
+        };
+
+        return sprintf(
+            '%s #%d %s (%d/%d)',
+            $instability->slot === RunSlot::Baseline ? 'A' : 'B',
+            $instability->index,
+            $kind,
+            $instability->observed,
+            $instability->iterations,
+        );
     }
 
     /**

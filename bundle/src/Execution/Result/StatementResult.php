@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Dan\Probe\Execution\Result;
 
+use Dan\Lib\Protocol\StatementDivergence;
+
 /**
  * The immutable result for one statement position across measured iterations.
  */
@@ -14,7 +16,8 @@ final readonly class StatementResult
         private int $index,
         private string $sql,
         private array $durationSamplesNs,
-        private bool $divergent,
+        private int $observed,
+        private StatementDivergence $divergence,
     ) {}
 
     /**
@@ -22,7 +25,8 @@ final readonly class StatementResult
      *     index: int,
      *     sql: string,
      *     durationsNsSamples: list<int>,
-     *     divergent: bool
+     *     observed: int,
+     *     divergence: string
      * }
      */
     public function toArray(): array
@@ -31,7 +35,8 @@ final readonly class StatementResult
             'index' => $this->index,
             'sql' => $this->sql,
             'durationsNsSamples' => $this->durationSamplesNs,
-            'divergent' => $this->divergent,
+            'observed' => $this->observed,
+            'divergence' => $this->divergence->value,
         ];
     }
 }

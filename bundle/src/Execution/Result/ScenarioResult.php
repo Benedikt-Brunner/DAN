@@ -50,7 +50,8 @@ final readonly class ScenarioResult
      *         index: int,
      *         sql: string,
      *         durationsNsSamples: list<int>,
-     *         divergent: bool
+     *         observed: int,
+     *         divergence: string
      *     }>
      * }
      */

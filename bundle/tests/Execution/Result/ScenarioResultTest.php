@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Dan\Probe\Tests\Execution\Result;
 
 use Dan\Lib\Filesystem\AbsolutePath;
+use Dan\Lib\Protocol\StatementDivergence;
 use Dan\Probe\Execution\Result\ScenarioResult;
 use Dan\Probe\Execution\Result\ScenarioResultWriter;
 use Dan\Probe\Execution\Result\StatementResult;
@@ -32,7 +33,8 @@ final class ScenarioResultTest extends TestCase
                     10,
                     20,
                 ],
-                divergent: true,
+                observed: 2,
+                divergence: StatementDivergence::Text,
             )],
         );
 
@@ -55,7 +57,8 @@ final class ScenarioResultTest extends TestCase
                         10,
                         20,
                     ],
-                    'divergent' => true,
+                    'observed' => 2,
+                    'divergence' => 'text',
                 ],
             ],
         ], $result->toArray());
