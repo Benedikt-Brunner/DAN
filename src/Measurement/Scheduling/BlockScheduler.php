@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Dan\Harness\Measurement\Scheduling;
 
 use Dan\Harness\Protocol\Protocol;
+use Dan\Lib\Collections\Set;
 use InvalidArgumentException;
 
 /**
@@ -40,16 +41,16 @@ final class BlockScheduler
         $remainder = $protocol->measuredIterations % $protocol->blocks;
 
         $plan = [];
-        /** @var array<string, bool> $cellWarmupScheduled */
-        $cellWarmupScheduled = [];
+        /** @var Set<RunSlot> $cellWarmed */
+        $cellWarmed = Set::create([]);
         for ($block = 0; $block < $protocol->blocks; ++$block) {
             $iterations = $iterationsPerBlock + ($block < $remainder ? 1 : 0);
             $ordered = $block % 2 === 0 ? $slots : array_reverse($slots);
             foreach ($ordered as $slot) {
                 $warmup = $protocol->blockWarmupIterations;
-                if (!isset($cellWarmupScheduled[$slot->value])) {
+                if (!$cellWarmed->contains($slot)) {
                     $warmup += $protocol->warmupIterations;
-                    $cellWarmupScheduled[$slot->value] = true;
+                    $cellWarmed = $cellWarmed->with($slot);
                 }
                 $plan[] = new MeasurementBlock(slot: $slot, warmupIterations: $warmup, iterations: $iterations, blockIndex: $block);
             }
