@@ -19,10 +19,20 @@ final readonly class SyntheticSchemaInstaller
 {
     public function __construct(private Connection $connection) {}
 
+    private const TABLE = 'dan_synthetic_blob';
+
     public function install(): void
     {
+        // Idempotent without issuing DDL when nothing is missing: in MySQL
+        // every DDL statement commits implicitly, even a no-op CREATE TABLE
+        // IF NOT EXISTS - which would break callers seeding inside a
+        // transaction (the kernel tests do).
+        if ($this->connection->fetchOne('SHOW TABLES LIKE :table', ['table' => self::TABLE]) !== false) {
+            return;
+        }
+
         $this->connection->executeStatement(<<<'SQL'
-            CREATE TABLE IF NOT EXISTS `dan_synthetic_blob` (
+            CREATE TABLE `dan_synthetic_blob` (
                 `id` BINARY(16) NOT NULL,
                 `name` VARCHAR(255) NOT NULL,
                 `payload` JSON NOT NULL,

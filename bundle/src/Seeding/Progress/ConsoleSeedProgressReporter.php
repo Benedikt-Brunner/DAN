@@ -12,27 +12,12 @@ final readonly class ConsoleSeedProgressReporter implements SeedProgressReporter
         private OutputInterface $output,
     ) {}
 
-    public function seedingCategories(int $total): void
+    public function seeding(string $what, int $total): void
     {
-        $this->output->writeln(sprintf('Seeding %d categories...', $total));
+        $this->output->writeln(sprintf('Seeding %d %s...', $total, $what));
     }
 
-    public function seedingProducts(int $total): void
-    {
-        $this->output->writeln(sprintf('Seeding %d products...', $total));
-    }
-
-    public function productsSeeded(int $seeded, int $total): void
-    {
-        $this->output->writeln(sprintf('  %d / %d', $seeded, $total));
-    }
-
-    public function seedingSyntheticBlobs(int $total): void
-    {
-        $this->output->writeln(sprintf('Seeding %d synthetic blobs...', $total));
-    }
-
-    public function syntheticBlobsSeeded(int $seeded, int $total): void
+    public function seeded(int $seeded, int $total): void
     {
         $this->output->writeln(sprintf('  %d / %d', $seeded, $total));
     }

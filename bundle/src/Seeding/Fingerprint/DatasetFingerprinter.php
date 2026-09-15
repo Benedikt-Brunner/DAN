@@ -29,6 +29,7 @@ final readonly class DatasetFingerprinter
 {
     private const DAN_PRODUCT_NUMBERS = 'DAN-%';
     private const DAN_CATEGORY_NAMES = 'DAN Category %';
+    private const DAN_MEDIA_NAMES = 'dan-media-%';
 
     public function __construct(
         private Connection $connection,
@@ -44,6 +45,7 @@ final readonly class DatasetFingerprinter
             'netPath' => sprintf('$.c%s.net', Defaults::CURRENCY),
             'productNumbers' => self::DAN_PRODUCT_NUMBERS,
             'categoryNames' => self::DAN_CATEGORY_NAMES,
+            'mediaNames' => self::DAN_MEDIA_NAMES,
         ];
 
         $aspects = [];
@@ -79,7 +81,7 @@ final readonly class DatasetFingerprinter
                 SQL,
             'product' => <<<'SQL'
                 SELECT CONCAT_WS('|',
-                    HEX(`p`.`id`), `p`.`product_number`, `p`.`stock`, HEX(`p`.`tax_id`),
+                    HEX(`p`.`id`), HEX(`p`.`parent_id`), `p`.`product_number`, `p`.`ean`, `p`.`stock`, HEX(`p`.`tax_id`),
                     CAST(JSON_UNQUOTE(JSON_EXTRACT(`p`.`price`, :grossPath)) AS DECIMAL(12, 2)),
                     CAST(JSON_UNQUOTE(JSON_EXTRACT(`p`.`price`, :netPath)) AS DECIMAL(12, 2))
                 ) AS x
@@ -101,6 +103,18 @@ final readonly class DatasetFingerprinter
                 INNER JOIN `product` `p` ON `p`.`id` = `pc`.`product_id` AND `p`.`version_id` = `pc`.`product_version_id`
                 WHERE `p`.`version_id` = :liveVersion
                   AND `p`.`product_number` LIKE :productNumbers
+                SQL,
+            'review' => <<<'SQL'
+                SELECT CONCAT_WS('|', HEX(`r`.`id`), HEX(`r`.`product_id`), `r`.`title`, `r`.`points`, `r`.`status`) AS x
+                FROM `product_review` `r`
+                INNER JOIN `product` `p` ON `p`.`id` = `r`.`product_id` AND `p`.`version_id` = `r`.`product_version_id`
+                WHERE `p`.`version_id` = :liveVersion
+                  AND `p`.`product_number` LIKE :productNumbers
+                SQL,
+            'media' => <<<'SQL'
+                SELECT CONCAT_WS('|', HEX(`id`), `file_name`, `file_extension`, `mime_type`, `file_size`) AS x
+                FROM `media`
+                WHERE `file_name` LIKE :mediaNames
                 SQL,
             'synthetic-blob' => <<<'SQL'
                 SELECT CONCAT_WS('|',

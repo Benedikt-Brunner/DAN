@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Dan\Probe\Scenario\Corpus;
 
 use Dan\Probe\Scenario\Scenario;
+use Dan\Probe\Seeding\Dataset\TierSpec;
 use Dan\Probe\Synthetic\SyntheticBlobDefinition;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
@@ -23,9 +24,19 @@ final class SyntheticJsonPathScenario implements Scenario
         return 'synthetic.json-path';
     }
 
+    public function describe(): string
+    {
+        return 'Typed JSON-path filtering and sorting on a JSON field, resolved into engine-sensitive JSON_EXTRACT expressions';
+    }
+
     public function entity(): string
     {
         return SyntheticBlobDefinition::ENTITY_NAME;
+    }
+
+    public function considerInheritance(): bool
+    {
+        return false;
     }
 
     public function criteria(Context $context): Criteria
@@ -40,5 +51,12 @@ final class SyntheticJsonPathScenario implements Scenario
         $criteria->setTotalCountMode(Criteria::TOTAL_COUNT_MODE_EXACT);
 
         return $criteria;
+    }
+
+    public function expectedTotal(TierSpec $spec): int
+    {
+        return $spec->countSyntheticBlobs(
+            fn (int $index): bool => TierSpec::blobSegment($index) === 'segment-07' && TierSpec::blobActive($index) && TierSpec::blobScore($index) >= 900,
+        );
     }
 }
