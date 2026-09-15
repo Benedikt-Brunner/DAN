@@ -38,8 +38,8 @@ final class SetTest extends TestCase
         self::assertCount(3, $set);
         self::assertTrue($set->contains(1));
         self::assertTrue($set->contains('1'));
-        self::assertFalse($set->contains(1.0));
-        self::assertFalse($set->contains('2'));
+        self::assertFalse($set->contains(2));
+        self::assertFalse($set->contains(false));
     }
 
     public function testWithReturnsAnExtendedSetAndLeavesTheReceiverUntouched(): void

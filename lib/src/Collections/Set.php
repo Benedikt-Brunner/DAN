@@ -29,7 +29,11 @@ readonly class Set implements IteratorAggregate, Countable
     /**
      * Duplicates collapse onto their first occurrence.
      *
-     * @param list<Item> $items
+     * @template T
+     *
+     * @param list<T> $items
+     *
+     * @return static<T>
      */
     public static function create(array $items): static
     {
