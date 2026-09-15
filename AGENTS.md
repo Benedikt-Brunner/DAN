@@ -7,7 +7,7 @@ Instructions for coding agents working in this repository. DAN profiles the SQL 
 Three Composer packages with separate vendor dirs, PHPStan configs, and test setups:
 
 - **Root (`dan/harness`)** — `Dan\Harness\` in `src/`, the plain Symfony Console application (`bin/dan`) that orchestrates runs. PHP ≥ 8.4; test runner is Pest.
-- **`lib/` (`dan/lib`)** — `Dan\Lib\` in `lib/src/`, framework-independent contracts and value objects shared by both runtime packages. PHP ≥ 8.2 (must load everywhere the probe does).
+- **`lib/` (`dan/lib`)** — `Dan\Lib\` in `lib/src/`, framework-independent contracts, value objects, and general-purpose building blocks shared by (or usable from) both runtime packages. PHP ≥ 8.2 (must load everywhere the probe does).
 - **`bundle/` (`dan/probe`)** — `Dan\Probe\` in `bundle/src/`, a Symfony bundle installed *inside* each DAL runtime under test. PHP ≥ 8.2 (matches supported DAL versions); test runner stays plain PHPUnit.
 
 The harness and probe communicate only via CLI: the harness builds a DAL runtime from a Shopware skeleton with the probe (Composer path repo), then invokes the probe's `dan:execute` / `dan:seed` commands and parses their JSON output.
