@@ -7,7 +7,7 @@ services:
         arguments:
             $scenarios: !tagged_iterator dan.scenario
 
-    # Corpus scenarios
+    # Corpus scenarios (see CORPUS.md for the coverage matrix)
     Dan\Probe\Scenario\Corpus\ProductKeywordListingScenario:
         tags:
             - { name: dan.scenario }
@@ -19,6 +19,71 @@ services:
     Dan\Probe\Scenario\Corpus\SyntheticJsonPathScenario:
         tags:
             - { name: dan.scenario }
+
+    Dan\Probe\Scenario\Corpus\ProductEmptyResultScenario:
+        tags:
+            - { name: dan.scenario }
+
+    Dan\Probe\Scenario\Corpus\ProductBelowPageScenario:
+        tags:
+            - { name: dan.scenario }
+
+    Dan\Probe\Scenario\Corpus\ProductPageBoundaryScenario:
+        tags:
+            - { name: dan.scenario }
+
+    Dan\Probe\Scenario\Corpus\ProductMultiPageScenario:
+        tags:
+            - { name: dan.scenario }
+
+    Dan\Probe\Scenario\Corpus\ProductStockRangeScenario:
+        tags:
+            - { name: dan.scenario }
+
+    Dan\Probe\Scenario\Corpus\ProductTaxToOneScenario:
+        tags:
+            - { name: dan.scenario }
+
+    Dan\Probe\Scenario\Corpus\ProductInCategoryScenario:
+        tags:
+            - { name: dan.scenario }
+
+    Dan\Probe\Scenario\Corpus\ProductInheritedNameScenario:
+        tags:
+            - { name: dan.scenario }
+
+    Dan\Probe\Scenario\Corpus\ProductUnindexedEanScenario:
+        tags:
+            - { name: dan.scenario }
+
+    Dan\Probe\Scenario\Corpus\ProductGroupedByTaxScenario:
+        tags:
+            - { name: dan.scenario }
+
+    Dan\Probe\Scenario\Corpus\ProductScoreQueryScenario:
+        tags:
+            - { name: dan.scenario }
+
+    Dan\Probe\Scenario\Corpus\ProductPostFilterScenario:
+        tags:
+            - { name: dan.scenario }
+
+    Dan\Probe\Scenario\Corpus\CategoryTranslatedNameScenario:
+        tags:
+            - { name: dan.scenario }
+
+    Dan\Probe\Scenario\Corpus\CategoryByProductCountScenario:
+        tags:
+            - { name: dan.scenario }
+
+    Dan\Probe\Scenario\Corpus\ReviewDeepAssociationScenario:
+        tags:
+            - { name: dan.scenario }
+
+    Dan\Probe\Scenario\Corpus\MediaByExtensionScenario:
+        tags:
+            - { name: dan.scenario }
+
 
     Dan\Probe\Seeding\Dataset\DatasetSeeder: ~
     Dan\Probe\Seeding\Fingerprint\DatasetFingerprinter: ~

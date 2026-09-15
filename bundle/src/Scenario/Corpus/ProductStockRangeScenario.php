@@ -9,23 +9,24 @@ use Dan\Probe\Seeding\Dataset\TierSpec;
 use Shopware\Core\Content\Product\ProductDefinition;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
+use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\EqualsFilter;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\RangeFilter;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Sorting\FieldSorting;
 
 /**
- * A wide read with several associations of different cardinalities - the
- * kind of query where DAL changes to join/fetch strategies show up first.
+ * Query-shape dimension: flat. The baseline every association shape is
+ * measured against.
  */
-final class ProductDeepReadScenario implements Scenario
+final class ProductStockRangeScenario implements Scenario
 {
     public function name(): string
     {
-        return 'product.deep-read';
+        return 'product.stock-range';
     }
 
     public function describe(): string
     {
-        return 'Wide read loading several associations of different cardinality (to-one tax, to-many prices, many-to-many categories) behind a range filter and a sort, without exact total counting';
+        return 'Flat read: a single-table range predicate on an indexed integer column with a sort and no associations';
     }
 
     public function entity(): string
@@ -41,10 +42,9 @@ final class ProductDeepReadScenario implements Scenario
     public function criteria(Context $context): Criteria
     {
         $criteria = new Criteria();
-        $criteria->addFilter(new RangeFilter('stock', [RangeFilter::GTE => 10]));
-        $criteria->addAssociation('categories');
-        $criteria->addAssociation('tax');
-        $criteria->addAssociation('prices');
+        // Parents only: variants inherit most fields and would blur the count.
+        $criteria->addFilter(new EqualsFilter('parentId', null));
+        $criteria->addFilter(new RangeFilter('stock', [RangeFilter::GTE => 990]));
         $criteria->addSorting(new FieldSorting('stock', FieldSorting::DESCENDING));
         $criteria->setLimit(50);
 
@@ -53,7 +53,6 @@ final class ProductDeepReadScenario implements Scenario
 
     public function expectedTotal(TierSpec $spec): int
     {
-        // No exact total count: the DAL reports the page it loaded.
-        return min(50, $spec->countProducts(fn (int $index, bool $variant): bool => !$variant && $spec->productStock($index) >= 10));
+        return $spec->countProducts(fn (int $index, bool $variant): bool => !$variant && $spec->productStock($index) >= 990);
     }
 }

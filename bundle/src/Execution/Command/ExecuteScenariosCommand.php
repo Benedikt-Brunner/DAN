@@ -10,7 +10,6 @@ use Dan\Probe\Execution\Result\ScenarioResultWriter;
 use Dan\Probe\Recorder\RecordingBootstrap;
 use Dan\Probe\Scenario\ScenarioRegistry;
 use InvalidArgumentException;
-use Shopware\Core\Framework\Context;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -71,13 +70,10 @@ final class ExecuteScenariosCommand extends Command
         $filter = is_string($filter) ? $filter : null;
         $capturePlans = (bool) $input->getOption('capture-plans');
 
-        $context = Context::createDefaultContext();
-
         foreach ($this->scenarios->matching(filter: $filter) as $scenario) {
             $output->writeln(sprintf('Scenario <info>%s</info>', $scenario->name()));
             $result = $this->measurer->measure(
                 scenario: $scenario,
-                context: $context,
                 warmup: $warmup,
                 iterations: $iterations,
                 capturePlans: $capturePlans,

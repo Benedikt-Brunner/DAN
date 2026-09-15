@@ -6,15 +6,10 @@ namespace Dan\Probe\Seeding\Progress;
 
 interface SeedProgressReporter
 {
-    public function seedingCategories(int $total): void;
+    /** A new kind of rows starts being written, e.g. "products". */
+    public function seeding(string $what, int $total): void;
 
-    public function seedingProducts(int $total): void;
-
-    public function productsSeeded(int $seeded, int $total): void;
-
-    public function seedingSyntheticBlobs(int $total): void;
-
-    public function syntheticBlobsSeeded(int $seeded, int $total): void;
+    public function seeded(int $seeded, int $total): void;
 
     public function finished(): void;
 }

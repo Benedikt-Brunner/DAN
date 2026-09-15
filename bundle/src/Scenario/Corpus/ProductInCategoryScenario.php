@@ -5,28 +5,28 @@ declare(strict_types=1);
 namespace Dan\Probe\Scenario\Corpus;
 
 use Dan\Probe\Scenario\Scenario;
+use Dan\Probe\Seeding\Dataset\DeterministicId;
 use Dan\Probe\Seeding\Dataset\TierSpec;
 use Shopware\Core\Content\Product\ProductDefinition;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
-use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\ContainsFilter;
+use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\EqualsFilter;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Sorting\FieldSorting;
 
 /**
- * A storefront-listing-shaped read: translated-field filtering, a to-many
- * association, sorting and exact total counting on one of the widest core
- * entities. Variant children match through name inheritance.
+ * Query-shape dimension: many-to-many. The searcher joins the mapping
+ * table; inherited categories bring the variants along.
  */
-final class ProductKeywordListingScenario implements Scenario
+final class ProductInCategoryScenario implements Scenario
 {
     public function name(): string
     {
-        return 'product.keyword-listing';
+        return 'product.in-category';
     }
 
     public function describe(): string
     {
-        return 'Storefront listing: substring filter on a translated field, a to-many association, sorting and an exact total over a wide entity - variants included through inheritance';
+        return 'Filter through a many-to-many mapping table (product_category) by the associated id';
     }
 
     public function entity(): string
@@ -42,10 +42,9 @@ final class ProductKeywordListingScenario implements Scenario
     public function criteria(Context $context): Criteria
     {
         $criteria = new Criteria();
-        $criteria->addFilter(new ContainsFilter('name', 'DAN Product 000'));
-        $criteria->addAssociation('categories');
+        $criteria->addFilter(new EqualsFilter('categories.id', (string) DeterministicId::create('category:0')));
         $criteria->addSorting(new FieldSorting('productNumber', FieldSorting::ASCENDING));
-        $criteria->setLimit(24);
+        $criteria->setLimit(50);
         $criteria->setTotalCountMode(Criteria::TOTAL_COUNT_MODE_EXACT);
 
         return $criteria;
@@ -53,9 +52,7 @@ final class ProductKeywordListingScenario implements Scenario
 
     public function expectedTotal(TierSpec $spec): int
     {
-        // Names are "DAN Product %08d": only indexes below 100 000 read
-        // "DAN Product 000..."; with inheritance on, variants match through
-        // their parent's name.
-        return $spec->countProducts(fn (int $index, bool $variant): bool => $index < 100_000);
+        // Variants inherit their parent's categories.
+        return $spec->countProducts(fn (int $index, bool $variant): bool => $spec->productCategory($index) === 0);
     }
 }
