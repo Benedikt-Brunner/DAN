@@ -91,6 +91,13 @@ final class StatementAligner
             }
         }
 
+        // Backtrack from the front. Among equally long common subsequences
+        // prefer the one that keeps the two cursors side by side: when
+        // leaving both current statements unmatched still yields an optimal
+        // subsequence, they are a substitution pair, not a removal here and
+        // an insertion somewhere further down. Without this rule a repeated
+        // statement after a change lets the match drift onto the wrong copy
+        // and a substituted position would read as unchanged.
         $matches = [];
         $i = 0;
         $j = 0;
@@ -100,6 +107,9 @@ final class StatementAligner
                     $i,
                     $j,
                 ];
+                ++$i;
+                ++$j;
+            } elseif ($lengths[$i + 1][$j + 1] === $lengths[$i][$j]) {
                 ++$i;
                 ++$j;
             } elseif ($lengths[$i + 1][$j] >= $lengths[$i][$j + 1]) {

@@ -106,18 +106,23 @@ final class RunComparatorPropertyTest extends PropertyTestCase
                     self::assertCount(1, $comparison->cells);
                     $alignment = $comparison->cells[0]->alignment;
                     self::assertSame($changedPositions !== [], $alignment->sqlChanged());
-                    // A rewritten position can never align as unchanged, on
-                    // either side; with repeated statements around it the
-                    // alignment may honestly call it ambiguous instead of
-                    // modified, so the exact classification is only pinned
-                    // for repeat-free sequences.
-                    self::assertSame([], array_intersect($alignment->baselineIndices(AlignmentKind::Unchanged), $changedPositions));
-                    self::assertSame([], array_intersect($alignment->candidateIndices(AlignmentKind::Unchanged), $changedPositions));
-                    $fingerprints = array_map(fn ($statement) => $statement->sql, $cell->statements()->getItems());
-                    if (count(array_unique($fingerprints)) === count($fingerprints)) {
-                        self::assertSame($changedPositions, $alignment->baselineIndices(AlignmentKind::Modified));
-                        self::assertCount(count($changedPositions), $alignment->changes());
+                    // The candidate differs from the baseline by substitutions
+                    // only, so the alignment must pair exactly the rewritten
+                    // positions with themselves - as modified, or as ambiguous
+                    // when a repeated statement sits next to them - and leave
+                    // every other position unchanged. A drift onto another
+                    // copy of a repeated statement would fail this.
+                    $pairedPositions = [];
+                    foreach ($alignment->changes() as $change) {
+                        self::assertContains($change->kind, [
+                            AlignmentKind::Modified,
+                            AlignmentKind::Ambiguous,
+                        ]);
+                        self::assertSame($change->baselineIndex, $change->candidateIndex);
+                        $pairedPositions[] = (int) $change->baselineIndex;
                     }
+                    self::assertSame($changedPositions, $pairedPositions);
+                    self::assertCount(count($cell->statements()) - count($changedPositions), $alignment->baselineIndices(AlignmentKind::Unchanged));
                     self::assertTrue($comparison->cells[0]->hasUnstableStatements(), 'A divergence flag on either side must surface.');
                     $unstableSlots = array_map(fn ($instability) => $instability->slot, $comparison->cells[0]->unstableStatements);
                     self::assertContains($candidateCarriesDivergence ? RunSlot::Candidate : RunSlot::Baseline, $unstableSlots);

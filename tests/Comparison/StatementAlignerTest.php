@@ -187,6 +187,38 @@ final class StatementAlignerTest extends TestCase
         ], self::describe($alignment->items));
     }
 
+    public function testSubstitutionsBeforeARepeatedStatementStayAtTheirPositions(): void
+    {
+        // A greedy backtrack would match the second E of the baseline with
+        // the first E of the candidate, drop the first E as removed and let
+        // the substituted last position slip through as an insertion -
+        // reporting churn where the sequences differ only at 2, 3 and 5.
+        $alignment = StatementAligner::align(baseline: [
+            'A',
+            'B',
+            'C',
+            'D',
+            'E',
+            'E',
+        ], candidate: [
+            'A',
+            'B',
+            'X',
+            'Y',
+            'E',
+            'Z',
+        ]);
+
+        self::assertSame([
+            'unchanged 0->0',
+            'unchanged 1->1',
+            'modified 2->2',
+            'modified 3->3',
+            'unchanged 4->4',
+            'ambiguous 5->5',
+        ], self::describe($alignment->items));
+    }
+
     public function testAReorderIsARemovalPlusAnInsertion(): void
     {
         $alignment = StatementAligner::align(baseline: [
