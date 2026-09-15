@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Dan\Harness\Tests\RunStore\Artifact;
 
+use Dan\Harness\Measurement\Scheduling\MeasurementBlock;
+use Dan\Harness\Measurement\Scheduling\RunSlot;
 use Dan\Harness\Protocol\DatabaseTarget;
 use Dan\Harness\Protocol\Engine;
 use Dan\Harness\RunStore\Artifact\CellResult;
@@ -26,32 +28,39 @@ final class CellResultContractTest extends TestCase
             payload: self::fixture(),
             tier: Tier::S,
             database: new DatabaseTarget(engine: Engine::MySql, version: '8.0'),
+            block: new MeasurementBlock(slot: RunSlot::Candidate, warmupIterations: 1, iterations: 3, blockIndex: 2, executionOrder: 5),
         );
 
         self::assertSame('product.deep-read', $cell->scenario->toString());
+        self::assertCount(1, $cell->blocks);
+        self::assertSame(2, $cell->blocks[0]->blockIndex);
+        self::assertSame(5, $cell->blocks[0]->executionOrder);
+        self::assertSame(1, $cell->blocks[0]->warmupIterations);
+        self::assertSame(3, $cell->blocks[0]->iterations());
         self::assertSame([
             1250000,
             1190000,
             1210000,
-        ], $cell->wallSamples->toNsArray());
+        ], $cell->wallSamples()->toNsArray());
 
-        self::assertCount(2, $cell->statements);
-        self::assertSame(0, $cell->statements[0]->index);
-        self::assertSame('SELECT `product`.`id` FROM `product` WHERE `product`.`id` IN (?, ?, ?)', $cell->statements[0]->sql);
+        $statements = $cell->statements();
+        self::assertCount(2, $statements);
+        self::assertSame(0, $statements[0]->index);
+        self::assertSame('SELECT `product`.`id` FROM `product` WHERE `product`.`id` IN (?, ?, ?)', $statements[0]->sql);
         self::assertSame([
             420000,
             395000,
             402000,
-        ], $cell->statements[0]->durationSamples->toNsArray());
-        self::assertFalse($cell->statements[0]->divergent);
-        self::assertSame(1, $cell->statements[1]->index);
-        self::assertSame('SELECT `category`.`id`, `category`.`name` FROM `category` WHERE `category`.`id` = ?', $cell->statements[1]->sql);
+        ], $statements[0]->durationSamples->toNsArray());
+        self::assertFalse($statements[0]->divergent);
+        self::assertSame(1, $statements[1]->index);
+        self::assertSame('SELECT `category`.`id`, `category`.`name` FROM `category` WHERE `category`.`id` = ?', $statements[1]->sql);
         self::assertSame([
             310000,
             305000,
             322000,
-        ], $cell->statements[1]->durationSamples->toNsArray());
-        self::assertTrue($cell->statements[1]->divergent);
+        ], $statements[1]->durationSamples->toNsArray());
+        self::assertTrue($statements[1]->divergent);
     }
 
     /**

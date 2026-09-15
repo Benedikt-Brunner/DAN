@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Dan\Harness\Tests\Report;
 
+use Dan\Harness\Comparison\BlockComparison;
 use Dan\Harness\Comparison\CellComparison;
 use Dan\Harness\Comparison\RunComparison;
 use Dan\Harness\Gate\Policy;
@@ -132,7 +133,16 @@ final class MarkdownReportSnapshotTest extends TestCase
             ], p95Ms: [
                 9.9,
                 10.0,
-            ], changedIndices: [0]),
+            ], changedIndices: [0], blockMedianMs: [
+                [
+                    8.1,
+                    8.6,
+                ],
+                [
+                    8.3,
+                    8.0,
+                ],
+            ]),
         ];
         // The violations come from the real gate, so the report renders what
         // CI would actually enforce.
@@ -216,6 +226,7 @@ final class MarkdownReportSnapshotTest extends TestCase
      * @param array{float, float} $p95Ms baseline and candidate p95 wall time
      * @param list<int> $changedIndices
      * @param array{int, int} $statementCounts
+     * @param list<array{float, float}>|null $blockMedianMs baseline and candidate median per mirrored block pair; defaults to two pairs at the cell medians
      */
     private static function cell(
         string $scenario,
@@ -229,7 +240,24 @@ final class MarkdownReportSnapshotTest extends TestCase
             4,
         ],
         bool $divergent = false,
+        ?array $blockMedianMs = null,
     ): CellComparison {
+        $blocks = [];
+        foreach (
+            $blockMedianMs ?? [
+                $medianMs,
+                $medianMs,
+            ] as $blockIndex => $pair
+        ) {
+            $blocks[] = new BlockComparison(
+                blockIndex: $blockIndex,
+                baselineExecutionOrder: $blockIndex % 2 === 0 ? 2 * $blockIndex : 2 * $blockIndex + 1,
+                candidateExecutionOrder: $blockIndex % 2 === 0 ? 2 * $blockIndex + 1 : 2 * $blockIndex,
+                baselineMedianWall: Duration::fromNs($pair[0] * 1_000_000),
+                candidateMedianWall: Duration::fromNs($pair[1] * 1_000_000),
+            );
+        }
+
         return new CellComparison(
             scenario: ScenarioName::fromString($scenario),
             tier: $tier,
@@ -243,6 +271,7 @@ final class MarkdownReportSnapshotTest extends TestCase
             baselineP95Wall: Duration::fromNs($p95Ms[0] * 1_000_000),
             candidateP95Wall: Duration::fromNs($p95Ms[1] * 1_000_000),
             divergent: $divergent,
+            blocks: $blocks,
         );
     }
 }
