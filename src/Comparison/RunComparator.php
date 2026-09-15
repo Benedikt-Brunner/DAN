@@ -9,6 +9,7 @@ use Dan\Harness\Measurement\Result\SampleCollection;
 use Dan\Harness\Measurement\Result\SamplePair;
 use Dan\Harness\Measurement\Result\Statistics;
 use Dan\Harness\Measurement\Scheduling\RunSlot;
+use Dan\Harness\Protocol\Engine;
 use Dan\Harness\RunStore\Artifact\BlockResult;
 use Dan\Harness\RunStore\Artifact\BlockResultCollection;
 use Dan\Harness\RunStore\Artifact\CellResult;
@@ -91,8 +92,36 @@ final class RunComparator
             candidateP95Wall: $candidateWallStatistics->percentile(Statistics::P95),
             wallShift: $shiftEstimator->estimate(self::samplePairs(blocks: $blocks, baseline: $baselineWall, candidate: $candidateWall)),
             unstableStatements: $unstableStatements,
+            planChanges: self::planChanges(
+                alignment: $alignment,
+                engine: $baselineCell->database->engine,
+                baseline: $baselineStatements,
+                candidate: $candidateStatements,
+            ),
             blocks: $blocks,
         );
+    }
+
+    /**
+     * One plan comparison per aligned change, so a reviewer can see why the
+     * changed SQL ran differently - not for unchanged statements, whose plans
+     * are still in the artifacts.
+     *
+     * @return list<StatementPlanComparison>
+     */
+    private static function planChanges(StatementAlignment $alignment, Engine $engine, StatementProfileCollection $baseline, StatementProfileCollection $candidate): array
+    {
+        $comparisons = [];
+        foreach ($alignment->changes() as $change) {
+            $comparisons[] = new StatementPlanComparison(
+                statement: $change,
+                engine: $engine,
+                baseline: $change->baselineIndex === null ? null : $baseline[$change->baselineIndex]->plan,
+                candidate: $change->candidateIndex === null ? null : $candidate[$change->candidateIndex]->plan,
+            );
+        }
+
+        return $comparisons;
     }
 
     /**

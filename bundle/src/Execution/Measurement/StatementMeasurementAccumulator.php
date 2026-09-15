@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Dan\Probe\Execution\Measurement;
 
 use Dan\Lib\Protocol\StatementDivergence;
+use Dan\Probe\Execution\Result\CapturedPlan;
 use Dan\Probe\Execution\Result\StatementResult;
 use Dan\Probe\Recorder\RecordedStatement;
 
@@ -40,8 +41,9 @@ final class StatementMeasurementAccumulator
     /**
      * @param int $iterations the measured iterations of the scenario; a position
      *                        observed in fewer of them is intermittent
+     * @param CapturedPlan|null $plan the position's query plan, when plans were captured
      */
-    public function result(int $iterations): StatementResult
+    public function result(int $iterations, ?CapturedPlan $plan): StatementResult
     {
         return new StatementResult(
             index: $this->index,
@@ -49,6 +51,7 @@ final class StatementMeasurementAccumulator
             durationSamplesNs: $this->durationSamplesNs,
             observed: $this->observed,
             divergence: StatementDivergence::fromFlags(textDiffers: $this->textDiffers, intermittent: $this->observed < $iterations),
+            plan: $plan,
         );
     }
 }

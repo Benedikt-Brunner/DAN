@@ -38,6 +38,7 @@ final class ScenarioResultTest extends TestCase
                 ],
                 observed: 2,
                 divergence: StatementDivergence::Text,
+                plan: null,
             )],
         );
 
@@ -67,6 +68,7 @@ final class ScenarioResultTest extends TestCase
                     ],
                     'observed' => 2,
                     'divergence' => 'text',
+                    'plan' => null,
                 ],
             ],
         ], $result->toArray());

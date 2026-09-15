@@ -1,0 +1,24 @@
+{
+    "query_block": {
+        "select_id": 1,
+        "table": {
+            "update": true,
+            "table_name": "product",
+            "access_type": "range",
+            "possible_keys": [
+                "PRIMARY"
+            ],
+            "key": "PRIMARY",
+            "used_key_parts": [
+                "id"
+            ],
+            "key_length": "16",
+            "ref": [
+                "const"
+            ],
+            "rows_examined_per_scan": 1,
+            "filtered": "100.00",
+            "attached_condition": "(`dan`.`product`.`id` = unhex(lpad(hex(1),32,'0')))"
+        }
+    }
+}

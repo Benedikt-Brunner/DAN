@@ -15,6 +15,10 @@ namespace Dan\Harness\Measurement\Scheduling;
  * block's position in the session's actual execution sequence for the cell,
  * unique across slots. Both are persisted with the block's samples so a cell
  * artifact can reconstruct the exact schedule it was measured under.
+ *
+ * capturePlans marks the one block per slot that also explains every
+ * recorded statement after timing - plans do not change between blocks,
+ * and capturing them once keeps the artifacts compact.
  */
 final class MeasurementBlock
 {
@@ -24,5 +28,6 @@ final class MeasurementBlock
         public readonly int $iterations,
         public readonly int $blockIndex,
         public readonly int $executionOrder,
+        public readonly bool $capturePlans,
     ) {}
 }

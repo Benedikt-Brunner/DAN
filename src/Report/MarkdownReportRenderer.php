@@ -10,6 +10,7 @@ use Dan\Harness\Comparison\BlockComparison;
 use Dan\Harness\Comparison\CellComparison;
 use Dan\Harness\Comparison\RunComparison;
 use Dan\Harness\Comparison\StatementInstability;
+use Dan\Harness\Comparison\StatementPlanComparison;
 use Dan\Harness\Environment\DatabaseImage;
 use Dan\Harness\Environment\ExecutionEnvironment;
 use Dan\Harness\Gate\Violation;
@@ -41,6 +42,7 @@ final class MarkdownReportRenderer
         $this->appendViolations(markdown: $markdown, violations: $violations);
         $this->appendResultDivergence(markdown: $markdown, cells: $comparison->cells);
         $this->appendCellTables(markdown: $markdown, cells: $comparison->cells);
+        $this->appendQueryPlans(markdown: $markdown, cells: $comparison->cells);
         $this->appendBlockDiagnostics(markdown: $markdown, cells: $comparison->cells);
         $this->appendMissingCells(markdown: $markdown, side: 'A', cells: $comparison->cellsOnlyInBaseline);
         $this->appendMissingCells(markdown: $markdown, side: 'B', cells: $comparison->cellsOnlyInCandidate);
@@ -330,6 +332,56 @@ final class MarkdownReportRenderer
     private function formatP95(Duration $duration, bool $indicativeOnly): string
     {
         return sprintf('%.2fms%s', $duration->toMsFloat(), $indicativeOnly ? '*' : '');
+    }
+
+    /**
+     * Why changed SQL ran differently: the engine's plan on each side of
+     * every aligned change, with the material differences called out. Plans
+     * of unchanged statements stay in the cell artifacts.
+     *
+     * @param list<CellComparison> $cells
+     */
+    private function appendQueryPlans(MarkdownBuilder $markdown, array $cells): void
+    {
+        $cellsWithChanges = array_values(array_filter($cells, fn (CellComparison $cell): bool => $cell->planChanges !== []));
+        if ($cellsWithChanges === []) {
+            return;
+        }
+
+        $markdown
+            ->heading('Query plans of changed statements')
+            ->blankLine()
+            ->line('Captured with `EXPLAIN FORMAT=JSON` after timing, bound to the parameter values the DAL used. Row counts are the optimizer\'s estimates.')
+            ->blankLine()
+            ->tableRow([
+                'Cell',
+                'Statement',
+                'Plan A',
+                'Plan B',
+                'Material changes',
+            ])
+            ->line('|---|---|---|---|---|');
+        foreach ($cellsWithChanges as $cell) {
+            $cellName = sprintf('%s / %s / %s', $cell->scenario->toString(), $cell->tier->value, $cell->database->id());
+            foreach ($cell->planChanges as $planChange) {
+                $markdown->tableRow($this->formatPlanChange(cellName: $cellName, planChange: $planChange));
+            }
+        }
+        $markdown->blankLine();
+    }
+
+    /** @return list<string> */
+    private function formatPlanChange(string $cellName, StatementPlanComparison $planChange): array
+    {
+        $changes = $planChange->materialChanges();
+
+        return [
+            $cellName,
+            $this->describeChange($planChange->statement),
+            $planChange->describeBaseline(),
+            $planChange->describeCandidate(),
+            $changes === [] ? ($planChange->baselineFacts === null || $planChange->candidateFacts === null ? 'n/a' : 'none') : implode('; ', $changes),
+        ];
     }
 
     /**

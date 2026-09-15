@@ -1,0 +1,56 @@
+{
+    "query_block": {
+        "select_id": 1,
+        "cost": 1.13043812,
+        "having_condition": "count(0) > 1",
+        "filesort": {
+            "sort_key": "count(0) desc",
+            "temporary_table": {
+                "nested_loop": [
+                    {
+                        "table": {
+                            "table_name": "product_category",
+                            "access_type": "index",
+                            "possible_keys": [
+                                "PRIMARY"
+                            ],
+                            "key": "fk_category",
+                            "key_length": "32",
+                            "used_key_parts": [
+                                "category_id",
+                                "category_version_id"
+                            ],
+                            "loops": 1,
+                            "rows": 1000,
+                            "cost": 0.15931452,
+                            "filtered": 100,
+                            "using_index": true
+                        }
+                    },
+                    {
+                        "table": {
+                            "table_name": "product",
+                            "access_type": "ref",
+                            "possible_keys": [
+                                "PRIMARY"
+                            ],
+                            "key": "PRIMARY",
+                            "key_length": "16",
+                            "used_key_parts": [
+                                "id"
+                            ],
+                            "ref": [
+                                "dan.product_category.product_id"
+                            ],
+                            "loops": 1000,
+                            "rows": 1,
+                            "cost": 0.9711236,
+                            "filtered": 100,
+                            "attached_condition": "product.product_number like 'SW1%'"
+                        }
+                    }
+                ]
+            }
+        }
+    }
+}

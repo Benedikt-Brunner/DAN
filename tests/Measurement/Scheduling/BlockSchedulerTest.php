@@ -127,6 +127,27 @@ final class BlockSchedulerTest extends TestCase
         ], $warmups);
     }
 
+    public function testOnlyTheFirstBlockOfEachSlotCapturesQueryPlans(): void
+    {
+        $scheduler = new BlockScheduler();
+
+        $plan = $scheduler->schedule(slots: [
+            RunSlot::Baseline,
+            RunSlot::Candidate,
+        ], protocol: self::protocol(iterations: 8, blocks: 4));
+
+        self::assertSame([
+            'baseline:yes',
+            'candidate:yes',
+            'candidate:no',
+            'baseline:no',
+            'baseline:no',
+            'candidate:no',
+            'candidate:no',
+            'baseline:no',
+        ], array_map(fn (MeasurementBlock $block): string => $block->slot->value . ':' . ($block->capturePlans ? 'yes' : 'no'), $plan));
+    }
+
     public function testZeroBlockWarmupLeavesLaterBlocksCold(): void
     {
         // The protocol may opt out of per-block warmup; the schedule must then

@@ -28,7 +28,21 @@
                 402000
             ],
             "observed": 3,
-            "divergence": "none"
+            "divergence": "none",
+            "plan": {
+                "capture": "captured",
+                "raw": {
+                    "query_block": {
+                        "select_id": 1,
+                        "table": {
+                            "table_name": "product",
+                            "access_type": "range",
+                            "key": "PRIMARY",
+                            "rows_examined_per_scan": 3
+                        }
+                    }
+                }
+            }
         },
         {
             "index": 1,
@@ -39,7 +53,11 @@
                 322000
             ],
             "observed": 2,
-            "divergence": "text-and-presence"
+            "divergence": "text-and-presence",
+            "plan": {
+                "capture": "unsupported",
+                "raw": null
+            }
         }
     ]
 }

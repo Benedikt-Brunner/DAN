@@ -1,0 +1,20 @@
+{
+    "query_block": {
+        "select_id": 1,
+        "table": {
+            "update": 1,
+            "table_name": "product",
+            "access_type": "range",
+            "possible_keys": [
+                "PRIMARY"
+            ],
+            "key": "PRIMARY",
+            "key_length": "16",
+            "used_key_parts": [
+                "id"
+            ],
+            "rows": 1,
+            "attached_condition": "product.`id` = unhex(lpad(hex(1),32,'0'))"
+        }
+    }
+}

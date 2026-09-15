@@ -22,6 +22,14 @@ Protocol: 5 warmup + 30 measured iterations in 4 blocks, 2 warmup at the start o
 
 Delta: estimated median shift with its 95% bootstrap interval. \* p95 from fewer than 100 samples is close to the largest observed value and only indicative.
 
+## Query plans of changed statements
+
+Captured with `EXPLAIN FORMAT=JSON` after timing, bound to the parameter values the DAL used. Row counts are the optimizer's estimates.
+
+| Cell | Statement | Plan A | Plan B | Material changes |
+|---|---|---|---|---|
+| product.keyword-listing / S / mysql-8.0 | ~0 | no statement | no statement | n/a |
+
 ## Block diagnostics
 
 Median wall time per mirrored block pair. "Order" is which implementation ran first within the pair; a delta that flips sign between pairs points at an order effect or host drift rather than at the implementation.
