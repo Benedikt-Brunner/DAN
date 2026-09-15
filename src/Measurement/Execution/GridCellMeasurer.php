@@ -111,7 +111,7 @@ final class GridCellMeasurer
                     if (!is_array($data)) {
                         throw new RuntimeException(sprintf('Malformed scenario result "%s".', $scenarioFile->toString()));
                     }
-                    $result = CellResult::fromDecodedScenarioArray(payload: $data, tier: $tier, database: $database);
+                    $result = CellResult::fromDecodedScenarioArray(payload: $data, tier: $tier, database: $database, block: $block);
                     $run->directory->mergeIntoCell(id: new CellId(scenario: $result->scenario, tier: $tier, database: $database), result: $result);
                 }
             }

@@ -23,7 +23,8 @@ final class ScenarioResultContractTest extends TestCase
             scenario: 'product.deep-read',
             entity: 'product',
             dalVersion: 'v6.6.10.22',
-            iterations: 3,
+            warmupIterations: 1,
+            measuredIterations: 3,
             wallSamplesNs: [
                 1250000,
                 1190000,

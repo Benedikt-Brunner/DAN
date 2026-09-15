@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Dan\Harness\Report;
 
+use Dan\Harness\Comparison\BlockComparison;
 use Dan\Harness\Comparison\CellComparison;
 use Dan\Harness\Comparison\RunComparison;
 use Dan\Harness\Gate\Violation;
@@ -31,6 +32,7 @@ final class MarkdownReportRenderer
         $this->appendProtocol(markdown: $markdown, comparison: $comparison);
         $this->appendViolations(markdown: $markdown, violations: $violations);
         $this->appendCellTables(markdown: $markdown, cells: $comparison->cells);
+        $this->appendBlockDiagnostics(markdown: $markdown, cells: $comparison->cells);
         $this->appendMissingCells(markdown: $markdown, side: 'A', cells: $comparison->cellsOnlyInBaseline);
         $this->appendMissingCells(markdown: $markdown, side: 'B', cells: $comparison->cellsOnlyInCandidate);
 
@@ -157,6 +159,10 @@ final class MarkdownReportRenderer
         if ($cell->divergent) {
             $sqlStatus .= ' :grey_question: divergent';
         }
+        $delta = sprintf('%+.1f%%', $cell->wallDeltaPct());
+        if ($cell->blockEffectsDisagree()) {
+            $delta .= ' :grey_question: blocks disagree';
+        }
 
         return [
             $cell->scenario->toString(),
@@ -164,9 +170,58 @@ final class MarkdownReportRenderer
             $sqlStatus,
             sprintf('%.2fms', $cell->baselineMedianWall->toMsFloat()),
             sprintf('%.2fms', $cell->candidateMedianWall->toMsFloat()),
-            sprintf('%+.1f%%', $cell->wallDeltaPct()),
+            $delta,
             sprintf('%.2fms', $cell->baselineP95Wall->toMsFloat()),
             sprintf('%.2fms', $cell->candidateP95Wall->toMsFloat()),
+        ];
+    }
+
+    /**
+     * Per mirrored block pair, so order effects and drift over the session
+     * are visible instead of averaged into the headline delta.
+     *
+     * @param list<CellComparison> $cells
+     */
+    private function appendBlockDiagnostics(MarkdownBuilder $markdown, array $cells): void
+    {
+        $cellsWithBlocks = array_values(array_filter($cells, fn (CellComparison $cell): bool => $cell->blocks !== []));
+        if ($cellsWithBlocks === []) {
+            return;
+        }
+
+        $markdown
+            ->heading('Block diagnostics')
+            ->blankLine()
+            ->line('Median wall time per mirrored block pair. "Order" is which implementation ran first within the pair; a delta that flips sign between pairs points at an order effect or host drift rather than at the implementation.')
+            ->blankLine()
+            ->tableRow([
+                'Cell',
+                'Block',
+                'Order',
+                'Median A',
+                'Median B',
+                'Delta',
+            ])
+            ->line('|---|---:|---|---:|---:|---:|');
+        foreach ($cellsWithBlocks as $cell) {
+            $cellName = sprintf('%s / %s / %s', $cell->scenario->toString(), $cell->tier->value, $cell->database->id());
+            foreach ($cell->blocks as $block) {
+                $markdown->tableRow($this->formatBlock(cellName: $cellName, block: $block));
+            }
+        }
+        $markdown->blankLine();
+    }
+
+    /** @return list<string> */
+    private function formatBlock(string $cellName, BlockComparison $block): array
+    {
+        return [
+            $cellName,
+            (string) $block->blockIndex,
+            $block->baselineRanFirst() ? 'A, B' : 'B, A',
+            sprintf('%.2fms', $block->baselineMedianWall->toMsFloat()),
+            sprintf('%.2fms', $block->candidateMedianWall->toMsFloat()),
+            sprintf('%+.1f%%', $block->wallDeltaPct()),
         ];
     }
 

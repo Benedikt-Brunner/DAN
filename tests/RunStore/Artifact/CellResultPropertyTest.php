@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace Dan\Harness\Tests\RunStore\Artifact;
 
 use Dan\Harness\Measurement\Result\SampleCollection;
-use Dan\Harness\Measurement\Result\Statistics;
+use Dan\Harness\RunStore\Artifact\BlockResult;
+use Dan\Harness\RunStore\Artifact\BlockResultCollection;
 use Dan\Harness\RunStore\Artifact\CellResult;
 use Dan\Harness\RunStore\Artifact\CellResultSchemaVersion;
 use Dan\Harness\RunStore\Artifact\StatementProfile;
@@ -17,9 +18,10 @@ use RuntimeException;
 
 /**
  * Cell artifacts must survive JSON transport bit-for-bit, and merging block
- * results must accumulate sample multisets independent of block order -
- * medians and percentiles are computed from the merged samples, so any
- * order dependence would make reported latencies depend on scheduling.
+ * results must be a union of blocks independent of arrival order - block
+ * membership is the experimental design of a session, and the pooled
+ * medians and percentiles are derived from it, so any order dependence or
+ * lost block identity would make reported latencies depend on scheduling.
  */
 final class CellResultPropertyTest extends PropertyTestCase
 {
@@ -33,86 +35,105 @@ final class CellResultPropertyTest extends PropertyTestCase
         });
     }
 
-    public function testMergeAccumulatesSampleMultisetsInAnyOrder(): void
+    public function testMergeUnionsBlocksInAnyOrderWithoutLosingTheirIdentity(): void
     {
         $this->forAll(
             DomainGenerators::cellResult(),
-            DomainGenerators::samples(),
-            DomainGenerators::samples(),
-        )->then(function (CellResult $blockA, mixed $otherWallSamples, mixed $otherDurations): void {
-            $otherWallSamples = DomainGenerators::asIntList($otherWallSamples);
-            // The second block carries its own duration samples - were they
-            // shared with the first block's, a merge that drops either
-            // side's samples would still compare equal below.
-            $otherDurations = DomainGenerators::asIntList($otherDurations);
-            $statementsB = [];
-            foreach ($blockA->statements as $statement) {
-                $statementsB[] = new StatementProfile(
-                    index: $statement->index,
-                    sql: $statement->sql,
-                    durationSamples: SampleCollection::fromArray($otherDurations),
-                    divergent: $statement->divergent,
-                );
-            }
-            $blockB = new CellResult(
-                scenario: $blockA->scenario,
-                tier: $blockA->tier,
-                database: $blockA->database,
-                wallSamples: SampleCollection::fromArray($otherWallSamples),
-                statements: StatementProfileCollection::create($statementsB),
-            );
+            Generator\choose(0, 1000),
+        )->then(function (CellResult $cell, int $splitSeed): void {
+            // Split the cell's blocks into two partial results - the way
+            // block results arrive one dan:execute at a time - and merge
+            // them in both orders.
+            $blocks = $cell->blocks->getItems();
+            $split = $splitSeed % (count($blocks) + 1);
+            $first = self::withBlocks(cell: $cell, blocks: array_slice($blocks, 0, $split));
+            $second = self::withBlocks(cell: $cell, blocks: array_slice($blocks, $split));
 
-            $ab = $blockA->merge($blockB);
-            $ba = $blockB->merge($blockA);
+            $ab = $first->merge($second);
+            $ba = $second->merge($first);
 
-            $expectedWall = [
-                ...$blockA->wallSamples->toNsArray(),
-                ...$otherWallSamples,
-            ];
-            sort($expectedWall);
-            $abWall = $ab->wallSamples->toNsArray();
-            $baWall = $ba->wallSamples->toNsArray();
-            sort($abWall);
-            sort($baWall);
-            self::assertSame($expectedWall, $abWall);
-            self::assertSame($expectedWall, $baWall);
-            self::assertSame(
-                Statistics::create($ab->wallSamples)->median()->toNsFloat(),
-                Statistics::create($ba->wallSamples)->median()->toNsFloat(),
-            );
+            self::assertSame($cell->toArray(), $ab->toArray(), 'Merging the parts must rebuild the whole cell, block identity included.');
+            self::assertSame($cell->toArray(), $ba->toArray(), 'Merge order must not matter.');
 
-            foreach ($ab->statements as $index => $statement) {
-                $expectedDurations = [
-                    ...$blockA->statements[$index]->durationSamples->toNsArray(),
-                    ...$otherDurations,
+            $expectedWall = [];
+            foreach ($cell->blocks as $block) {
+                $expectedWall = [
+                    ...$expectedWall,
+                    ...$block->wallSamples->toNsArray(),
                 ];
-                sort($expectedDurations);
-                $abDurations = $statement->durationSamples->toNsArray();
-                $baDurations = $ba->statements[$index]->durationSamples->toNsArray();
-                sort($abDurations);
-                sort($baDurations);
-                self::assertSame($expectedDurations, $abDurations);
-                self::assertSame($expectedDurations, $baDurations);
             }
+            self::assertSame($expectedWall, $ab->wallSamples()->toNsArray(), 'Pooled samples follow execution order.');
         });
     }
 
-    public function testMergingIdenticalStatementSequencesNeverFlagsDivergence(): void
+    public function testBlocksAreOrderedByExecutionPositionWhateverTheirInputOrder(): void
     {
         $this->forAll(DomainGenerators::cellResult())->then(function (CellResult $cell): void {
-            $merged = $cell->merge($cell);
+            $reversed = BlockResultCollection::inExecutionOrder(array_reverse($cell->blocks->getItems()));
 
-            foreach ($merged->statements as $index => $statement) {
+            self::assertSame($cell->blocks->toArray(), $reversed->toArray());
+            $orders = array_map(fn (BlockResult $block): int => $block->executionOrder, $reversed->getItems());
+            $sorted = $orders;
+            sort($sorted);
+            self::assertSame($sorted, $orders);
+        });
+    }
+
+    public function testMergeRefusesABlockRecordedTwice(): void
+    {
+        $this->forAll(DomainGenerators::cellResult())->then(function (CellResult $cell): void {
+            // fail() must stay outside the try: AssertionFailedError extends
+            // RuntimeException, so inside it the catch would swallow the
+            // failure and an accepted merge could never fail the property.
+            try {
+                $cell->merge($cell);
+            } catch (RuntimeException) {
+                // Refused - exactly what the property demands. A plain
+                // expectException would end the test after the first
+                // iteration and silently skip every other generated case.
+                $this->addToAssertionCount(1);
+
+                return;
+            }
+
+            self::fail('Merging a cell with itself duplicated its blocks instead of being refused.');
+        });
+    }
+
+    public function testPooledStatementsAccumulateEveryBlocksDurationSamples(): void
+    {
+        $this->forAll(DomainGenerators::cellResult())->then(function (CellResult $cell): void {
+            $pooled = $cell->statements();
+
+            self::assertCount(count($cell->blocks[0]->statements), $pooled);
+            foreach ($pooled as $index => $statement) {
+                $expected = [];
+                foreach ($cell->blocks as $block) {
+                    $expected = [
+                        ...$expected,
+                        ...$block->statements[$index]->durationSamples->toNsArray(),
+                    ];
+                }
+                self::assertSame($expected, $statement->durationSamples->toNsArray());
+                self::assertSame($cell->blocks[0]->statements[$index]->sql, $statement->sql);
+            }
+        });
+    }
+
+    public function testPoolingIdenticalStatementSequencesNeverFlagsDivergence(): void
+    {
+        $this->forAll(DomainGenerators::cellResult())->then(function (CellResult $cell): void {
+            foreach ($cell->statements() as $index => $statement) {
                 self::assertSame(
-                    $cell->statements[$index]->divergent,
+                    $cell->blocks[0]->statements[$index]->divergent,
                     $statement->divergent,
-                    'Merging identical SQL must never introduce divergence.',
+                    'Pooling identical SQL across blocks must never introduce divergence.',
                 );
             }
         });
     }
 
-    public function testMergingDifferentSqlAtAnyPositionFlagsExactlyThatStatement(): void
+    public function testABlockWithDifferentSqlAtAnyPositionFlagsExactlyThatStatement(): void
     {
         $this->forAll(
             DomainGenerators::cellResult(),
@@ -120,9 +141,10 @@ final class CellResultPropertyTest extends PropertyTestCase
         )->then(function (CellResult $cell, int $positionSeed): void {
             // Any position, not just the last - a merge that only compares
             // the tail of the sequence must fail here.
-            $position = $positionSeed % count($cell->statements);
+            $statements = $cell->blocks[0]->statements;
+            $position = $positionSeed % count($statements);
             $changed = [];
-            foreach ($cell->statements as $index => $statement) {
+            foreach ($statements as $index => $statement) {
                 $changed[] = new StatementProfile(
                     index: $statement->index,
                     sql: $index === $position ? $statement->sql . ' /* changed */' : $statement->sql,
@@ -130,24 +152,36 @@ final class CellResultPropertyTest extends PropertyTestCase
                     divergent: $statement->divergent,
                 );
             }
-            $other = new CellResult(
-                scenario: $cell->scenario,
-                tier: $cell->tier,
-                database: $cell->database,
-                wallSamples: $cell->wallSamples,
-                statements: StatementProfileCollection::create($changed),
-            );
+            $laterBlock = self::withBlocks(cell: $cell, blocks: [self::blockAfter(cell: $cell, statements: StatementProfileCollection::create($changed))]);
 
-            $merged = $cell->merge($other);
+            $merged = $cell->merge($laterBlock);
 
-            self::assertTrue($merged->statements[$position]->divergent);
-            // The first block's SQL wins; averaging apples and oranges is
+            $pooled = $merged->statements();
+            self::assertTrue($pooled[$position]->divergent);
+            // The earliest block's SQL wins; averaging apples and oranges is
             // exactly what the flag prevents.
-            self::assertSame($cell->statements[$position]->sql, $merged->statements[$position]->sql);
-            foreach ($merged->statements as $index => $statement) {
+            self::assertSame($statements[$position]->sql, $pooled[$position]->sql);
+            foreach ($pooled as $index => $statement) {
                 if ($index !== $position) {
-                    self::assertSame($cell->statements[$index]->divergent, $statement->divergent);
+                    self::assertSame($cell->statements()[$index]->divergent, $statement->divergent);
                 }
+            }
+        });
+    }
+
+    public function testDivergenceFromAnyBlockStaysSticky(): void
+    {
+        // A statement flagged divergent in ANY block must stay flagged in the
+        // pooled view, whichever block carries the flag.
+        $this->forAll(DomainGenerators::cellResult(), Generator\bool())->then(function (CellResult $cell, bool $flagOnLaterBlock): void {
+            $unflagged = self::withAllDivergentFlags(cell: $cell, divergent: false);
+            $laterBlock = self::blockAfter(cell: $cell, statements: self::statementsWithDivergentFlags(statements: $cell->blocks[0]->statements, divergent: $flagOnLaterBlock));
+            $earlier = $flagOnLaterBlock ? $unflagged : self::withAllDivergentFlags(cell: $cell, divergent: true);
+
+            $merged = $earlier->merge(self::withBlocks(cell: $cell, blocks: [$laterBlock]));
+
+            foreach ($merged->statements() as $statement) {
+                self::assertTrue($statement->divergent);
             }
         });
     }
@@ -156,8 +190,8 @@ final class CellResultPropertyTest extends PropertyTestCase
     {
         // Every runtime validation in the decode path must actually fire:
         // one wrongly-typed field anywhere in the payload - including inside
-        // nested statements and the database target - must be refused, never
-        // silently coerced into a differently-shaped cell.
+        // nested blocks, statements and the database target - must be
+        // refused, never silently coerced into a differently-shaped cell.
         $corruptions = [
             [
                 ['schemaVersion'],
@@ -194,22 +228,69 @@ final class CellResultPropertyTest extends PropertyTestCase
                 9,
             ],
             [
-                ['wallNsSamples'],
+                ['blocks'],
                 'none',
             ],
             [
                 [
+                    'blocks',
+                    0,
+                ],
+                'block',
+            ],
+            [
+                [
+                    'blocks',
+                    0,
+                    'blockIndex',
+                ],
+                'first',
+            ],
+            [
+                [
+                    'blocks',
+                    0,
+                    'executionOrder',
+                ],
+                1.5,
+            ],
+            [
+                [
+                    'blocks',
+                    0,
+                    'warmupIterations',
+                ],
+                'two',
+            ],
+            [
+                [
+                    'blocks',
+                    0,
+                    'wallNsSamples',
+                ],
+                'none',
+            ],
+            [
+                [
+                    'blocks',
+                    0,
                     'wallNsSamples',
                     0,
                 ],
                 'fast',
             ],
             [
-                ['statements'],
+                [
+                    'blocks',
+                    0,
+                    'statements',
+                ],
                 'none',
             ],
             [
                 [
+                    'blocks',
+                    0,
                     'statements',
                     0,
                 ],
@@ -217,6 +298,8 @@ final class CellResultPropertyTest extends PropertyTestCase
             ],
             [
                 [
+                    'blocks',
+                    0,
                     'statements',
                     0,
                     'index',
@@ -225,6 +308,8 @@ final class CellResultPropertyTest extends PropertyTestCase
             ],
             [
                 [
+                    'blocks',
+                    0,
                     'statements',
                     0,
                     'sql',
@@ -233,6 +318,8 @@ final class CellResultPropertyTest extends PropertyTestCase
             ],
             [
                 [
+                    'blocks',
+                    0,
                     'statements',
                     0,
                     'durationsNsSamples',
@@ -241,6 +328,8 @@ final class CellResultPropertyTest extends PropertyTestCase
             ],
             [
                 [
+                    'blocks',
+                    0,
                     'statements',
                     0,
                     'durationsNsSamples',
@@ -250,6 +339,8 @@ final class CellResultPropertyTest extends PropertyTestCase
             ],
             [
                 [
+                    'blocks',
+                    0,
                     'statements',
                     0,
                     'divergent',
@@ -288,43 +379,6 @@ final class CellResultPropertyTest extends PropertyTestCase
         });
     }
 
-    public function testDivergenceFromEitherBlockStaysSticky(): void
-    {
-        // A statement flagged divergent in ANY merged block must stay
-        // flagged, whichever side carries the flag.
-        $this->forAll(DomainGenerators::cellResult(), Generator\bool())->then(function (CellResult $cell, bool $flagOnOther): void {
-            $unflagged = $this->withAllDivergentFlags(cell: $cell, divergent: false);
-            $flagged = $this->withAllDivergentFlags(cell: $cell, divergent: true);
-
-            $merged = $flagOnOther ? $unflagged->merge($flagged) : $flagged->merge($unflagged);
-
-            foreach ($merged->statements as $statement) {
-                self::assertTrue($statement->divergent);
-            }
-        });
-    }
-
-    private function withAllDivergentFlags(CellResult $cell, bool $divergent): CellResult
-    {
-        $statements = [];
-        foreach ($cell->statements as $statement) {
-            $statements[] = new StatementProfile(
-                index: $statement->index,
-                sql: $statement->sql,
-                durationSamples: $statement->durationSamples,
-                divergent: $divergent,
-            );
-        }
-
-        return new CellResult(
-            scenario: $cell->scenario,
-            tier: $cell->tier,
-            database: $cell->database,
-            wallSamples: $cell->wallSamples,
-            statements: StatementProfileCollection::create($statements),
-        );
-    }
-
     public function testRefusesEveryForeignSchemaVersion(): void
     {
         $this->forAll(
@@ -353,5 +407,66 @@ final class CellResultPropertyTest extends PropertyTestCase
 
             self::fail(sprintf('Schema version %d was accepted.', $foreignVersion));
         });
+    }
+
+    /**
+     * @param list<BlockResult> $blocks
+     */
+    private static function withBlocks(CellResult $cell, array $blocks): CellResult
+    {
+        return new CellResult(
+            scenario: $cell->scenario,
+            tier: $cell->tier,
+            database: $cell->database,
+            blocks: BlockResultCollection::inExecutionOrder($blocks),
+        );
+    }
+
+    /**
+     * A new block scheduled after every block the cell already has, carrying
+     * the given statement sequence and the first block's wall samples.
+     */
+    private static function blockAfter(CellResult $cell, StatementProfileCollection $statements): BlockResult
+    {
+        $lastBlock = $cell->blocks[count($cell->blocks) - 1];
+
+        return new BlockResult(
+            blockIndex: $lastBlock->blockIndex + 1,
+            executionOrder: $lastBlock->executionOrder + 2,
+            warmupIterations: $lastBlock->warmupIterations,
+            wallSamples: SampleCollection::fromArray($cell->blocks[0]->wallSamples->toNsArray()),
+            statements: $statements,
+        );
+    }
+
+    private static function withAllDivergentFlags(CellResult $cell, bool $divergent): CellResult
+    {
+        $blocks = [];
+        foreach ($cell->blocks as $block) {
+            $blocks[] = new BlockResult(
+                blockIndex: $block->blockIndex,
+                executionOrder: $block->executionOrder,
+                warmupIterations: $block->warmupIterations,
+                wallSamples: $block->wallSamples,
+                statements: self::statementsWithDivergentFlags(statements: $block->statements, divergent: $divergent),
+            );
+        }
+
+        return self::withBlocks(cell: $cell, blocks: $blocks);
+    }
+
+    private static function statementsWithDivergentFlags(StatementProfileCollection $statements, bool $divergent): StatementProfileCollection
+    {
+        $flagged = [];
+        foreach ($statements as $statement) {
+            $flagged[] = new StatementProfile(
+                index: $statement->index,
+                sql: $statement->sql,
+                durationSamples: $statement->durationSamples,
+                divergent: $divergent,
+            );
+        }
+
+        return StatementProfileCollection::create($flagged);
     }
 }

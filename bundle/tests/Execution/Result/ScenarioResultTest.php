@@ -19,7 +19,8 @@ final class ScenarioResultTest extends TestCase
             scenario: 'product.keyword/listing',
             entity: 'product',
             dalVersion: '6.6.0',
-            iterations: 2,
+            warmupIterations: 1,
+            measuredIterations: 2,
             wallSamplesNs: [
                 100,
                 200,
@@ -40,7 +41,8 @@ final class ScenarioResultTest extends TestCase
             'scenario' => 'product.keyword/listing',
             'entity' => 'product',
             'dalVersion' => '6.6.0',
-            'iterations' => 2,
+            'warmupIterations' => 1,
+            'measuredIterations' => 2,
             'wallNsSamples' => [
                 100,
                 200,
@@ -65,7 +67,8 @@ final class ScenarioResultTest extends TestCase
             scenario: 'product.keyword/listing',
             entity: 'product',
             dalVersion: null,
-            iterations: 0,
+            warmupIterations: 0,
+            measuredIterations: 0,
             wallSamplesNs: [],
             statements: [],
         );
@@ -101,7 +104,8 @@ final class ScenarioResultTest extends TestCase
             scenario: 'product.deep-read',
             entity: 'product',
             dalVersion: null,
-            iterations: 0,
+            warmupIterations: 0,
+            measuredIterations: 0,
             wallSamplesNs: [],
             statements: [],
         );

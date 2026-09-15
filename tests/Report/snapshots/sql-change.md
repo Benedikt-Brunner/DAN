@@ -14,3 +14,14 @@ Protocol: 5 warmup + 30 measured iterations in 4 blocks, 2 warmup at the start o
 |---|---|---|---:|---:|---:|---:|---:|
 | product.deep-read | 4 -> 5 | :warning: changed (1, 3) | 12.50ms | 12.60ms | +0.8% | 14.10ms | 14.30ms |
 | synthetic.json-path | 4 -> 4 | unchanged :grey_question: divergent | 3.00ms | 3.10ms | +3.3% | 3.40ms | 3.50ms |
+
+## Block diagnostics
+
+Median wall time per mirrored block pair. "Order" is which implementation ran first within the pair; a delta that flips sign between pairs points at an order effect or host drift rather than at the implementation.
+
+| Cell | Block | Order | Median A | Median B | Delta |
+|---|---:|---|---:|---:|---:|
+| product.deep-read / S / mysql-8.0 | 0 | A, B | 12.50ms | 12.60ms | +0.8% |
+| product.deep-read / S / mysql-8.0 | 1 | B, A | 12.50ms | 12.60ms | +0.8% |
+| synthetic.json-path / S / mysql-8.0 | 0 | A, B | 3.00ms | 3.10ms | +3.3% |
+| synthetic.json-path / S / mysql-8.0 | 1 | B, A | 3.00ms | 3.10ms | +3.3% |
