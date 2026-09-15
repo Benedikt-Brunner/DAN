@@ -27,6 +27,7 @@ final class ProtocolResolverTest extends TestCase
                 'M',
             ],
             warmupIterations: 5,
+            blockWarmupIterations: 2,
             measuredIterations: 30,
             blocks: 4,
             scenarioFilter: null,
@@ -49,6 +50,7 @@ final class ProtocolResolverTest extends TestCase
             databaseSpecs: ['mysql:8.4'],
             tiers: ['L'],
             warmupIterations: 3,
+            blockWarmupIterations: 2,
             measuredIterations: 10,
             blocks: 2,
             scenarioFilter: 'product.',
@@ -69,12 +71,14 @@ final class ProtocolResolverTest extends TestCase
             databaseSpecs: ['mysql:8.0'],
             tiers: ['S'],
             warmupIterations: 0,
+            blockWarmupIterations: 0,
             measuredIterations: 1,
             blocks: 1,
             scenarioFilter: null,
         );
 
         self::assertSame(0, $protocol->warmupIterations);
+        self::assertSame(0, $protocol->blockWarmupIterations);
         self::assertSame(1, $protocol->measuredIterations);
         self::assertSame(1, $protocol->blocks);
     }
@@ -92,6 +96,7 @@ final class ProtocolResolverTest extends TestCase
                 'S',
             ],
             warmupIterations: 0,
+            blockWarmupIterations: 2,
             measuredIterations: 10,
             blocks: 2,
             scenarioFilter: null,
@@ -112,6 +117,7 @@ final class ProtocolResolverTest extends TestCase
             databaseSpecs: ['mysql:8.0'],
             tiers: ['S'],
             warmupIterations: 0,
+            blockWarmupIterations: 2,
             measuredIterations: 0,
             blocks: 1,
             scenarioFilter: null,
@@ -127,6 +133,7 @@ final class ProtocolResolverTest extends TestCase
             databaseSpecs: ['mysql:8.0'],
             tiers: ['S'],
             warmupIterations: -1,
+            blockWarmupIterations: 2,
             measuredIterations: 10,
             blocks: 1,
             scenarioFilter: null,
@@ -142,6 +149,7 @@ final class ProtocolResolverTest extends TestCase
             databaseSpecs: ['mysql:8.0'],
             tiers: ['S'],
             warmupIterations: 0,
+            blockWarmupIterations: 2,
             measuredIterations: 10,
             blocks: 0,
             scenarioFilter: null,
@@ -157,6 +165,7 @@ final class ProtocolResolverTest extends TestCase
             databaseSpecs: ['mysql:8.0'],
             tiers: [],
             warmupIterations: 0,
+            blockWarmupIterations: 2,
             measuredIterations: 10,
             blocks: 1,
             scenarioFilter: null,
@@ -172,6 +181,7 @@ final class ProtocolResolverTest extends TestCase
             databaseSpecs: ['mysql:8.0'],
             tiers: ['XL'],
             warmupIterations: 5,
+            blockWarmupIterations: 2,
             measuredIterations: 30,
             blocks: 4,
             scenarioFilter: null,
@@ -187,6 +197,7 @@ final class ProtocolResolverTest extends TestCase
             databaseSpecs: ['postgres:16'],
             tiers: ['S'],
             warmupIterations: 5,
+            blockWarmupIterations: 2,
             measuredIterations: 30,
             blocks: 4,
             scenarioFilter: null,
@@ -202,6 +213,7 @@ final class ProtocolResolverTest extends TestCase
             databaseSpecs: ['mysql:8.0'],
             tiers: ['S'],
             warmupIterations: 5,
+            blockWarmupIterations: 2,
             measuredIterations: 3,
             blocks: 4,
             scenarioFilter: null,
@@ -217,8 +229,47 @@ final class ProtocolResolverTest extends TestCase
             databaseSpecs: [],
             tiers: ['S'],
             warmupIterations: 5,
+            blockWarmupIterations: 2,
             measuredIterations: 30,
             blocks: 4,
+            scenarioFilter: null,
+        );
+    }
+
+    public function testRecordsThePerBlockWarmupSeparatelyFromThePerCellWarmup(): void
+    {
+        // Two different things get warmed: the dataset once per cell, the
+        // probe process once per block. Folding them into one number would
+        // hide from the manifest which of the two a run actually performed.
+        $resolver = new ProtocolResolver();
+
+        $protocol = $resolver->resolve(
+            databaseSpecs: ['mysql:8.0'],
+            tiers: ['S'],
+            warmupIterations: 5,
+            blockWarmupIterations: 2,
+            measuredIterations: 30,
+            blocks: 4,
+            scenarioFilter: null,
+        );
+
+        self::assertSame(5, $protocol->warmupIterations);
+        self::assertSame(2, $protocol->blockWarmupIterations);
+        self::assertSame(2, $protocol->toArray()['blockWarmupIterations']);
+    }
+
+    public function testRejectsNegativeBlockWarmup(): void
+    {
+        $resolver = new ProtocolResolver();
+
+        $this->expectException(InvalidArgumentException::class);
+        $resolver->resolve(
+            databaseSpecs: ['mysql:8.0'],
+            tiers: ['S'],
+            warmupIterations: 0,
+            blockWarmupIterations: -1,
+            measuredIterations: 10,
+            blocks: 1,
             scenarioFilter: null,
         );
     }

@@ -50,6 +50,7 @@ final class RunCommand extends Command
             ->addOption('db', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Database target, e.g. "mysql:8.0" or "mariadb:11.4". Repeatable.')
             ->addOption('tier', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Dataset tier: S, M or L. Repeatable.')
             ->addOption('warmup', null, InputOption::VALUE_REQUIRED, 'Warmup iterations per implementation per cell (discarded).', '5')
+            ->addOption('block-warmup', null, InputOption::VALUE_REQUIRED, 'Additional warmup iterations at the start of every measurement block (each block is a fresh probe process; discarded).', '2')
             ->addOption('iterations', null, InputOption::VALUE_REQUIRED, 'Measured iterations per implementation per cell.', '30')
             ->addOption('blocks', null, InputOption::VALUE_REQUIRED, 'Number of alternating measurement blocks.', '4')
             ->addOption('filter', null, InputOption::VALUE_REQUIRED, 'Scenario name filter (substring match).')
@@ -71,6 +72,7 @@ final class RunCommand extends Command
             databaseSpecs: $options->databaseSpecs,
             tiers: $options->tiers,
             warmupIterations: $options->warmupIterations,
+            blockWarmupIterations: $options->blockWarmupIterations,
             measuredIterations: $options->measuredIterations,
             blocks: $options->blocks,
             scenarioFilter: $options->scenarioFilter,

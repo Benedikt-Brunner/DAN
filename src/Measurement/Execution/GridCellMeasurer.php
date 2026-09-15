@@ -80,14 +80,10 @@ final class GridCellMeasurer
             $blocks = $this->scheduler->schedule(slots: array_map(
                 fn (SessionRun $run): RunSlot => $run->slot,
                 $runs,
-            ), totalIterations: $protocol->measuredIterations, blocks: $protocol->blocks);
-            /** @var array<string, bool> $warmedUp */
-            $warmedUp = [];
+            ), protocol: $protocol);
             foreach ($blocks as $block) {
                 $slot = $block->slot->value;
                 $run = $bySlot[$slot];
-                $warmup = isset($warmedUp[$slot]) ? 0 : $protocol->warmupIterations;
-                $warmedUp[$slot] = true;
 
                 $blockDir = $run->directory->root->join('blocks', sprintf('%s-%s-block%d', $tier->value, $database->id(), $block->blockIndex));
                 if (!is_dir($blockDir->toString()) && !mkdir($blockDir->toString(), 0o777, true) && !is_dir($blockDir->toString())) {
@@ -99,7 +95,7 @@ final class GridCellMeasurer
                     '--iterations',
                     (string) $block->iterations,
                     '--warmup',
-                    (string) $warmup,
+                    (string) $block->warmupIterations,
                     '--output-dir',
                     $blockDir->toString(),
                 ];

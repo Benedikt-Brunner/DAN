@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Dan\Harness\Measurement\Scheduling;
 
+use Dan\Harness\Protocol\Protocol;
+use Dan\Lib\Collections\Set;
 use InvalidArgumentException;
 
 /**
@@ -12,6 +14,11 @@ use InvalidArgumentException;
  * throttling) hits all implementations roughly equally and cancels out of
  * the comparison. Uses mirrored ordering (A,B / B,A / A,B / ...) so linear
  * drift within a session cancels too.
+ *
+ * Every block carries its own warmup: the protocol's per-block warmup runs
+ * in every block (each block is a fresh probe process with a cold connection),
+ * and the first block of each implementation additionally runs the per-cell
+ * warmup that brings the dataset and buffer pool up to temperature.
  *
  * Isolation between implementations is NOT this class's job: each
  * implementation runs against its own database container with its own
@@ -24,21 +31,28 @@ final class BlockScheduler
      *
      * @return list<MeasurementBlock>
      */
-    public function schedule(array $slots, int $totalIterations, int $blocks): array
+    public function schedule(array $slots, Protocol $protocol): array
     {
         if ($slots === []) {
             throw new InvalidArgumentException('At least one implementation is required.');
         }
 
-        $iterationsPerBlock = intdiv($totalIterations, $blocks);
-        $remainder = $totalIterations % $blocks;
+        $iterationsPerBlock = intdiv($protocol->measuredIterations, $protocol->blocks);
+        $remainder = $protocol->measuredIterations % $protocol->blocks;
 
         $plan = [];
-        for ($block = 0; $block < $blocks; ++$block) {
+        /** @var Set<RunSlot> $cellWarmed */
+        $cellWarmed = Set::create([]);
+        for ($block = 0; $block < $protocol->blocks; ++$block) {
             $iterations = $iterationsPerBlock + ($block < $remainder ? 1 : 0);
             $ordered = $block % 2 === 0 ? $slots : array_reverse($slots);
             foreach ($ordered as $slot) {
-                $plan[] = new MeasurementBlock(slot: $slot, iterations: $iterations, blockIndex: $block);
+                $warmup = $protocol->blockWarmupIterations;
+                if (!$cellWarmed->contains($slot)) {
+                    $warmup += $protocol->warmupIterations;
+                    $cellWarmed = $cellWarmed->with($slot);
+                }
+                $plan[] = new MeasurementBlock(slot: $slot, warmupIterations: $warmup, iterations: $iterations, blockIndex: $block);
             }
         }
 

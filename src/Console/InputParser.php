@@ -25,6 +25,7 @@ final class InputParser
             databaseSpecs: $this->stringList(input: $input, name: 'db'),
             tiers: $this->stringList(input: $input, name: 'tier'),
             warmupIterations: $this->int(input: $input, name: 'warmup'),
+            blockWarmupIterations: $this->int(input: $input, name: 'block-warmup'),
             measuredIterations: $this->int(input: $input, name: 'iterations'),
             blocks: $this->int(input: $input, name: 'blocks'),
             scenarioFilter: $this->nullableString(input: $input, name: 'filter'),
@@ -104,11 +105,14 @@ final class InputParser
     private function int(InputInterface $input, string $name): int
     {
         $value = $input->getOption($name);
-        if (!is_numeric($value)) {
+        // is_numeric() would also admit "2.5" and "1e2", which an (int) cast
+        // silently truncates or expands; only genuine integer syntax passes.
+        $integer = is_int($value) || is_string($value) ? filter_var($value, \FILTER_VALIDATE_INT) : false;
+        if ($integer === false) {
             throw new InvalidArgumentException(sprintf('Option --%s expects an integer.', $name));
         }
 
-        return (int) $value;
+        return $integer;
     }
 
     private function nullableFloat(InputInterface $input, string $name): ?float

@@ -7,6 +7,7 @@ namespace Dan\Harness\Tests\Measurement\Scheduling;
 use Dan\Harness\Measurement\Scheduling\BlockScheduler;
 use Dan\Harness\Measurement\Scheduling\MeasurementBlock;
 use Dan\Harness\Measurement\Scheduling\RunSlot;
+use Dan\Harness\Protocol\Protocol;
 use Dan\Harness\Tests\DomainGenerators;
 use Dan\Harness\Tests\PropertyTestCase;
 use Eris\Generator;
@@ -31,7 +32,7 @@ final class BlockSchedulerPropertyTest extends PropertyTestCase
             ] = self::plan($plan);
 
             $totals = [];
-            foreach ((new BlockScheduler())->schedule(slots: $slots, totalIterations: $iterations, blocks: $blocks) as $block) {
+            foreach ((new BlockScheduler())->schedule(slots: $slots, protocol: self::protocol(iterations: $iterations, blocks: $blocks)) as $block) {
                 $totals[$block->slot->value] = ($totals[$block->slot->value] ?? 0) + $block->iterations;
             }
 
@@ -50,7 +51,7 @@ final class BlockSchedulerPropertyTest extends PropertyTestCase
                 $blocks,
             ] = self::plan($plan);
 
-            $scheduled = (new BlockScheduler())->schedule(slots: $slots, totalIterations: $iterations, blocks: $blocks);
+            $scheduled = (new BlockScheduler())->schedule(slots: $slots, protocol: self::protocol(iterations: $iterations, blocks: $blocks));
 
             self::assertCount($blocks * count($slots), $scheduled);
 
@@ -90,7 +91,7 @@ final class BlockSchedulerPropertyTest extends PropertyTestCase
                 $blocks,
             ] = self::plan($plan);
 
-            $scheduled = (new BlockScheduler())->schedule(slots: $slots, totalIterations: $iterations, blocks: $blocks);
+            $scheduled = (new BlockScheduler())->schedule(slots: $slots, protocol: self::protocol(iterations: $iterations, blocks: $blocks));
 
             $orderByIndex = [];
             foreach ($scheduled as $block) {
@@ -115,9 +116,52 @@ final class BlockSchedulerPropertyTest extends PropertyTestCase
             Generator\choose(1, 40),
         )->then(function (mixed $slots, int $iterations, int $blocks): void {
             $slots = self::slots($slots);
-            foreach ((new BlockScheduler())->schedule(slots: $slots, totalIterations: $iterations, blocks: $blocks) as $block) {
+            foreach ((new BlockScheduler())->schedule(slots: $slots, protocol: self::protocol(iterations: $iterations, blocks: $blocks)) as $block) {
                 self::assertInstanceOf(MeasurementBlock::class, $block);
                 self::assertGreaterThanOrEqual(0, $block->iterations);
+            }
+        });
+    }
+
+    public function testEveryBlockWarmsTheProcessAndEachSlotWarmsTheCellExactlyOnce(): void
+    {
+        $this->forAll(
+            $this->plans(),
+            Generator\choose(0, 50),
+            Generator\choose(0, 5),
+        )->then(function (mixed $plan, int $cellWarmup, int $blockWarmup): void {
+            [
+                $slots,
+                $iterations,
+                $blocks,
+            ] = self::plan($plan);
+
+            $scheduled = (new BlockScheduler())->schedule(
+                slots: $slots,
+                protocol: self::protocol(iterations: $iterations, blocks: $blocks, warmup: $cellWarmup, blockWarmup: $blockWarmup),
+            );
+
+            $cellWarmupsBySlot = [];
+            foreach ($scheduled as $block) {
+                // Never below the per-block warmup: a block boundary always
+                // injects a cold process, whatever came before it.
+                self::assertGreaterThanOrEqual($blockWarmup, $block->warmupIterations);
+                $extra = $block->warmupIterations - $blockWarmup;
+                self::assertContains($extra, [
+                    0,
+                    $cellWarmup,
+                ]);
+                if ($extra === $cellWarmup) {
+                    $cellWarmupsBySlot[$block->slot->value] = ($cellWarmupsBySlot[$block->slot->value] ?? 0) + 1;
+                }
+            }
+
+            foreach ($slots as $slot) {
+                // With a zero cell warmup every block reads as "cell-warmed",
+                // which is fine - the count only matters when it is nonzero.
+                if ($cellWarmup > 0) {
+                    self::assertSame(1, $cellWarmupsBySlot[$slot->value] ?? 0, sprintf('Slot %s must warm the cell exactly once.', $slot->value));
+                }
             }
         });
     }
@@ -203,5 +247,18 @@ final class BlockSchedulerPropertyTest extends PropertyTestCase
         }
 
         return $slots;
+    }
+
+    private static function protocol(int $iterations, int $blocks, int $warmup = 0, int $blockWarmup = 0): Protocol
+    {
+        return new Protocol(
+            databases: [],
+            tiers: [],
+            warmupIterations: $warmup,
+            blockWarmupIterations: $blockWarmup,
+            measuredIterations: $iterations,
+            blocks: $blocks,
+            scenarioFilter: null,
+        );
     }
 }

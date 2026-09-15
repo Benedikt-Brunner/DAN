@@ -23,6 +23,7 @@ final class RunOptions
         public readonly array $databaseSpecs,
         public readonly array $tiers,
         public readonly int $warmupIterations,
+        public readonly int $blockWarmupIterations,
         public readonly int $measuredIterations,
         public readonly int $blocks,
         public readonly ?string $scenarioFilter,
