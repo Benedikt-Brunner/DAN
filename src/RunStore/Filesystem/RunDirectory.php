@@ -6,6 +6,7 @@ namespace Dan\Harness\RunStore\Filesystem;
 
 use Dan\Harness\RunStore\Artifact\CellId;
 use Dan\Harness\RunStore\Artifact\CellResult;
+use Dan\Harness\RunStore\Artifact\RecordedDataset;
 use Dan\Harness\RunStore\Artifact\RunManifest;
 use Dan\Lib\Filesystem\Path;
 use RuntimeException;
@@ -14,6 +15,7 @@ use RuntimeException;
  * On-disk layout of a single run (one DAL implementation):
  *
  *   <root>/manifest.json
+ *   <root>/datasets/<tier>--<engine-version>.json (logical fingerprint of the seeded dataset)
  *   <root>/cells/<scenario>--<tier>--<engine-version>.json
  *   <root>/index.sqlite (derived, see SqliteIndexer)
  */
@@ -25,11 +27,36 @@ final class RunDirectory
 
     public function initialize(RunManifest $manifest): void
     {
-        $cells = $this->root->join('cells');
-        if (!is_dir($cells->toString()) && !mkdir($cells->toString(), 0o777, true) && !is_dir($cells->toString())) {
-            throw new RuntimeException(sprintf('Could not create run directory "%s".', $this->root->toString()));
+        foreach (
+            [
+                'cells',
+                'datasets',
+            ] as $directory
+        ) {
+            $path = $this->root->join($directory);
+            if (!is_dir($path->toString()) && !mkdir($path->toString(), 0o777, true) && !is_dir($path->toString())) {
+                throw new RuntimeException(sprintf('Could not create run directory "%s".', $this->root->toString()));
+            }
         }
         $this->writeJson(path: $this->root->join('manifest.json'), data: $manifest->toArray());
+    }
+
+    public function writeDataset(RecordedDataset $dataset): void
+    {
+        $this->writeJson(path: $this->root->join('datasets', $dataset->fileName()), data: $dataset->toArray());
+    }
+
+    /**
+     * @return list<string> dataset file names, the natural join key between two runs
+     */
+    public function datasetFileNames(): array
+    {
+        return array_map(basename(...), glob($this->root->join('datasets', '*.json')->toString()) ?: []);
+    }
+
+    public function readDatasetByFileName(string $fileName): RecordedDataset
+    {
+        return RecordedDataset::fromDecodedArray($this->readJson($this->root->join('datasets', $fileName)));
     }
 
     public function manifest(): RunManifest

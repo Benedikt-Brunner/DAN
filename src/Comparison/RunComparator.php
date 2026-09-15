@@ -46,10 +46,37 @@ final class RunComparator
             candidateManifest: $candidateManifest,
             protocolsMatch: $baselineManifest->protocol->equals($candidateManifest->protocol),
             environmentsComparable: $baselineManifest->environment->comparableTo($candidateManifest->environment),
+            datasetDivergences: self::datasetDivergences(baseline: $baseline, candidate: $candidate),
             cells: $cells,
             cellsOnlyInBaseline: array_values(array_diff($baselineFiles, $candidateFiles)),
             cellsOnlyInCandidate: array_values(array_diff($candidateFiles, $baselineFiles)),
         );
+    }
+
+    /**
+     * The seeded datasets both runs recorded fingerprints for, wherever the
+     * fingerprints disagree. A dataset fingerprinted on one side only is not
+     * a divergence - there is nothing to compare it with.
+     *
+     * @return list<DatasetDivergence>
+     */
+    private static function datasetDivergences(RunDirectory $baseline, RunDirectory $candidate): array
+    {
+        $divergences = [];
+        foreach (array_intersect($baseline->datasetFileNames(), $candidate->datasetFileNames()) as $fileName) {
+            $baselineDataset = $baseline->readDatasetByFileName($fileName);
+            $differences = $baselineDataset->fingerprint->differences($candidate->readDatasetByFileName($fileName)->fingerprint);
+            if ($differences === []) {
+                continue;
+            }
+            $divergences[] = new DatasetDivergence(
+                tier: $baselineDataset->tier,
+                database: $baselineDataset->database,
+                differences: $differences,
+            );
+        }
+
+        return $divergences;
     }
 
     private static function compareCell(CellResult $baselineCell, CellResult $candidateCell, MedianShiftEstimator $shiftEstimator): CellComparison

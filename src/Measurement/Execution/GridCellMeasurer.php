@@ -13,7 +13,9 @@ use Dan\Harness\Protocol\DatabaseTarget;
 use Dan\Harness\Protocol\Protocol;
 use Dan\Harness\RunStore\Artifact\CellId;
 use Dan\Harness\RunStore\Artifact\CellResult;
+use Dan\Harness\RunStore\Artifact\RecordedDataset;
 use Dan\Lib\Filesystem\Path;
+use Dan\Lib\Protocol\DatasetFingerprint;
 use Dan\Lib\Protocol\Tier;
 use RuntimeException;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -22,7 +24,9 @@ use Symfony\Component\Console\Output\OutputInterface;
  * Measures one grid cell (tier x database) for every implementation in the
  * session: starts one isolated database container per implementation,
  * restored from the cached data-directory snapshot or freshly seeded (and
- * then snapshotted), executes the scheduled measurement blocks
+ * then snapshotted), fingerprints every dataset and refuses to measure over
+ * datasets the implementations did not seed identically, then executes the
+ * scheduled measurement blocks
  * through each runtime's dan:execute, and merges the per-block scenario results
  * into the run's cell artifacts.
  */
@@ -54,6 +58,8 @@ final class GridCellMeasurer
 
         /** @var array<string, DatabaseInstance> $instances */
         $instances = [];
+        /** @var array<string, DatasetFingerprint> $fingerprints */
+        $fingerprints = [];
 
         try {
             // One isolated container per implementation - no shared caches.
@@ -77,7 +83,10 @@ final class GridCellMeasurer
                     ], database: $instances[$slot]);
                     $this->databaseManager->snapshot(instance: $instances[$slot], snapshot: $snapshotPath);
                 }
+
+                $fingerprints[$slot] = $this->fingerprintDataset(run: $run, instance: $instances[$slot], tier: $tier, database: $database);
             }
+            $this->requireEquivalentDatasets(fingerprints: $fingerprints, tier: $tier, database: $database);
 
             $blocks = $this->scheduler->schedule(slots: array_map(
                 fn (SessionRun $run): RunSlot => $run->slot,
@@ -124,6 +133,62 @@ final class GridCellMeasurer
             foreach ($instances as $instance) {
                 $this->databaseManager->stop($instance);
             }
+        }
+    }
+
+    /**
+     * The logical fingerprint of the dataset the cell will be measured on,
+     * computed by the implementation's own probe and recorded with the run.
+     */
+    private function fingerprintDataset(SessionRun $run, DatabaseInstance $instance, Tier $tier, DatabaseTarget $database): DatasetFingerprint
+    {
+        $datasetsDir = $run->directory->root->join('datasets');
+        $fingerprintFile = $datasetsDir->join(sprintf('%s-%s.fingerprint.json', $tier->value, $database->id()));
+        $run->runtime->run(args: [
+            'dan:fingerprint',
+            '--tier',
+            $tier->value,
+            '--output',
+            $fingerprintFile->toString(),
+        ], database: $instance);
+        $data = json_decode((string) file_get_contents($fingerprintFile->toString()), true, 512, \JSON_THROW_ON_ERROR);
+        unlink($fingerprintFile->toString());
+        if (!is_array($data)) {
+            throw new RuntimeException(sprintf('Malformed dataset fingerprint from run %s for tier %s on %s.', $run->slot->value, $tier->value, $database->id()));
+        }
+        $fingerprint = DatasetFingerprint::fromDecodedArray($data);
+        $run->directory->writeDataset(new RecordedDataset(tier: $tier, database: $database, fingerprint: $fingerprint));
+        $this->output->writeln(sprintf('  [%s] Dataset fingerprint recorded (%d aspects)', $run->slot->value, count($fingerprint->aspects)));
+
+        return $fingerprint;
+    }
+
+    /**
+     * Deterministic seed input does not prove the implementations wrote the
+     * same rows: a DAL write change, a default, an indexer or a failed
+     * association write makes the comparison operate on different data. That
+     * is a failed cell with entity-level diagnostics, never a latency table.
+     *
+     * @param array<string, DatasetFingerprint> $fingerprints by slot
+     */
+    private function requireEquivalentDatasets(array $fingerprints, Tier $tier, DatabaseTarget $database): void
+    {
+        $reference = null;
+        $referenceSlot = null;
+        foreach ($fingerprints as $slot => $fingerprint) {
+            if ($reference === null) {
+                $reference = $fingerprint;
+                $referenceSlot = $slot;
+
+                continue;
+            }
+            $differences = $reference->differences($fingerprint);
+            if ($differences !== []) {
+                throw new RuntimeException(sprintf('The %s and %s datasets for tier %s on %s are not logically equivalent - measuring would compare different data. %s', $referenceSlot, $slot, $tier->value, $database->id(), implode('; ', $differences)));
+            }
+        }
+        if (count($fingerprints) > 1) {
+            $this->output->writeln('  Datasets are logically equivalent across implementations');
         }
     }
 }
