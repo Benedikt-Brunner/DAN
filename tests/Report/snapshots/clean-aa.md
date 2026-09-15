@@ -12,14 +12,18 @@ Protocol: 5 warmup + 30 measured iterations in 4 blocks, 2 warmup at the start o
 
 | Scenario | Statements | SQL | Median A | Median B | Delta | p95 A | p95 B |
 |---|---|---|---:|---:|---:|---:|---:|
-| product.deep-read | 4 -> 4 | unchanged | 47.30ms | 47.30ms | +0.0% | 55.00ms | 55.00ms |
+| product.deep-read | 4 -> 4 | unchanged | 47.30ms | 47.30ms | +0.0% [-2.0%, +2.0%] | 55.00ms* | 55.00ms* |
+
+Delta: estimated median shift with its 95% bootstrap interval. \* p95 from fewer than 100 samples is close to the largest observed value and only indicative.
 
 ## S / mysql-8.0
 
 | Scenario | Statements | SQL | Median A | Median B | Delta | p95 A | p95 B |
 |---|---|---|---:|---:|---:|---:|---:|
-| product.deep-read | 4 -> 4 | unchanged | 12.50ms | 12.50ms | +0.0% | 14.10ms | 14.10ms |
-| product.keyword-listing | 4 -> 4 | unchanged | 8.20ms | 8.20ms | +0.0% | 9.90ms | 9.90ms |
+| product.deep-read | 4 -> 4 | unchanged | 12.50ms | 12.50ms | +0.0% [-2.0%, +2.0%] | 14.10ms* | 14.10ms* |
+| product.keyword-listing | 4 -> 4 | unchanged | 8.20ms | 8.20ms | +0.0% [-2.0%, +2.0%] | 9.90ms* | 9.90ms* |
+
+Delta: estimated median shift with its 95% bootstrap interval. \* p95 from fewer than 100 samples is close to the largest observed value and only indicative.
 
 ## Block diagnostics
 
