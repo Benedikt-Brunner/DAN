@@ -4,13 +4,16 @@ declare(strict_types=1);
 
 namespace Dan\Probe\Execution\Result;
 
+use Dan\Lib\Protocol\ResultSet;
 use Dan\Lib\Protocol\ScenarioResultSchemaVersion;
 
 /**
  * The probe-side scenario result of one dan:execute invocation - one
  * measurement block from the harness's point of view. It reports the warmup
  * and measured iteration counts it actually ran so the harness can verify the
- * block against its schedule. Conversion to the CLI protocol happens only at
+ * block against its schedule, and what the DAL returned (once, plus whether
+ * every measured iteration returned the same) so correctness can be compared
+ * alongside SQL and latency. Conversion to the CLI protocol happens only at
  * the artifact-writing boundary.
  */
 final readonly class ScenarioResult
@@ -25,6 +28,8 @@ final readonly class ScenarioResult
         private ?string $dalVersion,
         private int $warmupIterations,
         private int $measuredIterations,
+        private ResultSet $resultSet,
+        private bool $resultSetConsistent,
         private array $wallSamplesNs,
         private array $statements,
     ) {}
@@ -45,6 +50,8 @@ final readonly class ScenarioResult
      *     dalVersion: string|null,
      *     warmupIterations: int,
      *     measuredIterations: int,
+     *     resultSet: array{ids: list<string>, total: int},
+     *     resultSetConsistent: bool,
      *     wallNsSamples: list<int>,
      *     statements: list<array{
      *         index: int,
@@ -64,6 +71,8 @@ final readonly class ScenarioResult
             'dalVersion' => $this->dalVersion,
             'warmupIterations' => $this->warmupIterations,
             'measuredIterations' => $this->measuredIterations,
+            'resultSet' => $this->resultSet->toArray(),
+            'resultSetConsistent' => $this->resultSetConsistent,
             'wallNsSamples' => $this->wallSamplesNs,
             'statements' => array_map(
                 fn (StatementResult $statement): array => $statement->toArray(),

@@ -13,6 +13,7 @@ use Dan\Harness\RunStore\Artifact\StatementProfile;
 use Dan\Harness\RunStore\Artifact\StatementProfileCollection;
 use Dan\Harness\Tests\DomainGenerators;
 use Dan\Harness\Tests\PropertyTestCase;
+use Dan\Lib\Protocol\ResultSet;
 use Dan\Lib\Protocol\StatementDivergence;
 use Eris\Generator;
 use RuntimeException;
@@ -219,6 +220,38 @@ final class CellResultPropertyTest extends PropertyTestCase
         });
     }
 
+    public function testTheCellResultIsConsistentOnlyWhenEveryBlockAgreesInEveryIteration(): void
+    {
+        $this->forAll(DomainGenerators::cellResult())->then(function (CellResult $cell): void {
+            $everyBlockConsistent = true;
+            foreach ($cell->blocks as $block) {
+                $everyBlockConsistent = $everyBlockConsistent && $block->resultSetConsistent;
+                self::assertTrue($block->resultSet->equals($cell->resultSet()), 'Generated blocks share the cell result set.');
+            }
+
+            self::assertSame($everyBlockConsistent, $cell->resultSetConsistent());
+        });
+    }
+
+    public function testABlockReturningADifferentResultMakesTheCellInconsistent(): void
+    {
+        $this->forAll(DomainGenerators::cellResult(), DomainGenerators::resultSet())->then(function (CellResult $cell, mixed $otherResult): void {
+            $otherResult = DomainGenerators::asResultSet($otherResult);
+            if ($otherResult->equals($cell->resultSet())) {
+                // Nothing to test on this draw; the property is about differing results.
+                $this->addToAssertionCount(1);
+
+                return;
+            }
+            $laterBlock = self::blockAfter(cell: $cell, statements: $cell->blocks[0]->statements, resultSet: $otherResult);
+
+            $merged = $cell->merge(self::withBlocks(cell: $cell, blocks: [$laterBlock]));
+
+            self::assertFalse($merged->resultSetConsistent());
+            self::assertTrue($merged->resultSet()->equals($cell->resultSet()), 'The earliest block names the recorded result.');
+        });
+    }
+
     public function testRefusesTypeCorruptedPayloads(): void
     {
         // Every runtime validation in the decode path must actually fire:
@@ -294,6 +327,40 @@ final class CellResultPropertyTest extends PropertyTestCase
                     'warmupIterations',
                 ],
                 'two',
+            ],
+            [
+                [
+                    'blocks',
+                    0,
+                    'resultSet',
+                ],
+                'none',
+            ],
+            [
+                [
+                    'blocks',
+                    0,
+                    'resultSet',
+                    'ids',
+                ],
+                'abc',
+            ],
+            [
+                [
+                    'blocks',
+                    0,
+                    'resultSet',
+                    'total',
+                ],
+                '2',
+            ],
+            [
+                [
+                    'blocks',
+                    0,
+                    'resultSetConsistent',
+                ],
+                'yes',
             ],
             [
                 [
@@ -479,7 +546,7 @@ final class CellResultPropertyTest extends PropertyTestCase
      * A new block scheduled after every block the cell already has, carrying
      * the given statement sequence and the first block's wall samples.
      */
-    private static function blockAfter(CellResult $cell, StatementProfileCollection $statements): BlockResult
+    private static function blockAfter(CellResult $cell, StatementProfileCollection $statements, ?ResultSet $resultSet = null): BlockResult
     {
         $lastBlock = $cell->blocks[count($cell->blocks) - 1];
 
@@ -487,6 +554,8 @@ final class CellResultPropertyTest extends PropertyTestCase
             blockIndex: $lastBlock->blockIndex + 1,
             executionOrder: $lastBlock->executionOrder + 2,
             warmupIterations: $lastBlock->warmupIterations,
+            resultSet: $resultSet ?? $lastBlock->resultSet,
+            resultSetConsistent: true,
             wallSamples: SampleCollection::fromArray($cell->blocks[0]->wallSamples->toNsArray()),
             statements: $statements,
         );
@@ -500,6 +569,8 @@ final class CellResultPropertyTest extends PropertyTestCase
                 blockIndex: $block->blockIndex,
                 executionOrder: $block->executionOrder,
                 warmupIterations: $block->warmupIterations,
+                resultSet: $block->resultSet,
+                resultSetConsistent: $block->resultSetConsistent,
                 wallSamples: $block->wallSamples,
                 statements: self::statementsWithTextDivergence(statements: $block->statements, textDiffers: $textDiffers),
             );

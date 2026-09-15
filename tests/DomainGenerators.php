@@ -16,6 +16,7 @@ use Dan\Harness\RunStore\Artifact\CellResult;
 use Dan\Harness\RunStore\Artifact\RunManifest;
 use Dan\Harness\RunStore\Artifact\StatementProfile;
 use Dan\Harness\RunStore\Artifact\StatementProfileCollection;
+use Dan\Lib\Protocol\ResultSet;
 use Dan\Lib\Protocol\ScenarioName;
 use Dan\Lib\Protocol\StatementDivergence;
 use Dan\Lib\Protocol\Tier;
@@ -124,9 +125,31 @@ final class DomainGenerators
     }
 
     /**
+     * What a scenario returned: zero to eight hex ids in result order plus
+     * a total at least as large as the page.
+     *
+     * @return Generator<mixed>
+     */
+    public static function resultSet(): Generator
+    {
+        return Generator\map(
+            self::buildResultSet(...),
+            Generator\tuple(
+                Generator\bind(
+                    Generator\choose(0, 8),
+                    fn (int $count): Generator => Generator\vector($count, Generator\choose(0, 0xFFFFFF)),
+                ),
+                Generator\choose(0, 40),
+            ),
+        );
+    }
+
+    /**
      * A cell with one to three measurement blocks. Execution orders follow
      * the two-slot mirrored schedule for a randomly chosen slot, so block
      * index and execution order differ the way they do in real A/B runs.
+     * Every block returns the cell's result set; whether a block saw it in
+     * every iteration is random.
      *
      * @return Generator<mixed>
      */
@@ -139,13 +162,14 @@ final class DomainGenerators
                 self::databaseTarget(),
                 self::statementShapes(),
                 Generator\choose(0, 1),
+                self::resultSet(),
             ),
             self::cellResultWithBlocks(...),
         );
     }
 
     /**
-     * @param array<mixed> $head scenario, tier, database, statement shapes, slot position
+     * @param array<mixed> $head scenario, tier, database, statement shapes, slot position, result set
      *
      * @return Generator<mixed>
      */
@@ -178,6 +202,7 @@ final class DomainGenerators
                     Generator\vector(count($wallSamples), Generator\choose(0, 5_000_000_000)),
                     Generator\choose(0, count($wallSamples) - 1),
                 )),
+                Generator\bool(),
             ),
         );
     }
@@ -396,6 +421,15 @@ final class DomainGenerators
         return array_map(self::asDatabaseTarget(...), self::asList($value));
     }
 
+    public static function asResultSet(mixed $value): ResultSet
+    {
+        if (!$value instanceof ResultSet) {
+            throw new LogicException('Generated value is not a ResultSet.');
+        }
+
+        return $value;
+    }
+
     public static function asReferenceType(mixed $value): ReferenceType
     {
         if (!$value instanceof ReferenceType) {
@@ -438,6 +472,16 @@ final class DomainGenerators
             engine: self::asEngine($parts[0]),
             version: implode('.', array_slice($segments, 0, self::asInt($parts[4]))) . self::asString($parts[5]),
         );
+    }
+
+    /**
+     * @param array<mixed> $parts
+     */
+    private static function buildResultSet(array $parts): ResultSet
+    {
+        $ids = array_map(fn (int $seed): string => sprintf('%032x', $seed), self::asIntList($parts[0]));
+
+        return new ResultSet(ids: $ids, total: count($ids) + self::asInt($parts[1]));
     }
 
     /**
@@ -489,6 +533,8 @@ final class DomainGenerators
                 blockIndex: $blockIndex,
                 executionOrder: self::mirroredExecutionOrder(blockIndex: $blockIndex, slotPosition: $slotPosition),
                 warmupIterations: self::asInt($parts[0]),
+                resultSet: self::asResultSet($head[5]),
+                resultSetConsistent: self::asBool($parts[3]),
                 wallSamples: SampleCollection::fromArray($wallSamples),
                 statements: self::buildStatementProfiles(shapes: $shapes, observations: self::asList($parts[2]), iterations: count($wallSamples)),
             );

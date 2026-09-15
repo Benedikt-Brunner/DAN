@@ -7,6 +7,7 @@ namespace Dan\Harness\Tests\Comparison;
 use Dan\Harness\Comparison\AlignmentKind;
 use Dan\Harness\Comparison\RunComparator;
 use Dan\Harness\Gate\Policy;
+use Dan\Harness\Gate\ViolationKind;
 use Dan\Harness\Implementation\Identity\Identity;
 use Dan\Harness\Implementation\Reference\ReferenceType;
 use Dan\Harness\Measurement\Result\SampleCollection;
@@ -23,6 +24,7 @@ use Dan\Harness\RunStore\Artifact\StatementProfile;
 use Dan\Harness\RunStore\Artifact\StatementProfileCollection;
 use Dan\Harness\RunStore\Filesystem\RunDirectory;
 use Dan\Lib\Filesystem\Path;
+use Dan\Lib\Protocol\ResultSet;
 use Dan\Lib\Protocol\ScenarioName;
 use Dan\Lib\Protocol\StatementDivergence;
 use Dan\Lib\Protocol\Tier;
@@ -168,11 +170,41 @@ final class RunComparatorTest extends TestCase
         self::assertSame(0.0, $cell->wallDeltaPct(), 'The pooled medians cancel out - exactly why the per-block view exists.');
     }
 
+    public function testADifferentResultIsACorrectnessViolationWhateverTheLatency(): void
+    {
+        // Same SQL shape, candidate twice as fast - and returning one row
+        // fewer. The gate must fail on the result, not celebrate the speed.
+        $baseline = $this->writeRun(slot: RunSlot::Baseline, wallNs: [
+            10_000_000,
+            10_000_000,
+            10_000_000,
+        ], sql: 'SELECT `id` FROM `product`', resultSet: new ResultSet(ids: [
+            'a',
+            'b',
+        ], total: 2));
+        $candidate = $this->writeRun(slot: RunSlot::Candidate, wallNs: [
+            5_000_000,
+            5_000_000,
+            5_000_000,
+        ], sql: 'SELECT `id` FROM `product`', resultSet: new ResultSet(ids: ['a'], total: 1));
+
+        $comparison = RunComparator::compare(baseline: $baseline, candidate: $candidate);
+
+        $cell = $comparison->cells[0];
+        self::assertFalse($cell->resultSets->equivalent());
+        self::assertTrue($cell->resultSets->idsDiffer());
+        self::assertTrue($cell->resultSets->totalDiffers());
+        self::assertFalse($cell->sqlChanged());
+        $violations = (new Policy(maxWallRegressionPct: null, failOnSqlChange: false))->evaluate($comparison->cells);
+        self::assertCount(1, $violations);
+        self::assertSame(ViolationKind::ResultDivergence, $violations[0]->kind);
+    }
+
     /**
      * @param list<int> $wallNs integer nanoseconds of the single block written when $blocks is empty
      * @param list<array{int, list<int>}> $blocks execution order plus wall samples per block, in block-index order
      */
-    private function writeRun(RunSlot $slot, array $wallNs, string $sql, array $blocks = []): RunDirectory
+    private function writeRun(RunSlot $slot, array $wallNs, string $sql, array $blocks = [], ?ResultSet $resultSet = null): RunDirectory
     {
         $database = new DatabaseTarget(engine: Engine::MySql, version: '8.0');
         $protocol = new Protocol(
@@ -213,6 +245,11 @@ final class RunComparatorTest extends TestCase
                 blockIndex: $blockIndex,
                 executionOrder: $executionOrder,
                 warmupIterations: 1,
+                resultSet: $resultSet ?? new ResultSet(ids: [
+                    'a',
+                    'b',
+                ], total: 2),
+                resultSetConsistent: true,
                 wallSamples: SampleCollection::fromArray($blockWallNs),
                 statements: StatementProfileCollection::create([
                     new StatementProfile(index: 0, sql: $sql, durationSamples: SampleCollection::fromArray($blockWallNs), observed: count($blockWallNs), divergence: StatementDivergence::None),
