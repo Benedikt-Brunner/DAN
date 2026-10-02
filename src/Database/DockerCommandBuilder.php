@@ -50,6 +50,54 @@ final class DockerCommandBuilder
         ]);
     }
 
+    /**
+     * The engine's self-description as JSON on stdout: version, host OS and
+     * resources, and the published-port forwarding mode.
+     */
+    public static function engineInfo(Path $outputPath): self
+    {
+        return new self(
+            arguments: [
+                'docker',
+                'info',
+                '--format',
+                '{{json .}}',
+            ],
+            outputPath: $outputPath,
+        );
+    }
+
+    /**
+     * The first repository digest of a locally present image, e.g.
+     * "mysql@sha256:...", on stdout. Fails when the image is not pulled yet.
+     */
+    public static function imageDigest(DatabaseTarget $target, Path $outputPath): self
+    {
+        return new self(
+            arguments: [
+                'docker',
+                'image',
+                'inspect',
+                '--format',
+                '{{index .RepoDigests 0}}',
+                '--',
+                self::getImageIdentifier($target),
+            ],
+            outputPath: $outputPath,
+        );
+    }
+
+    public static function pullImage(DatabaseTarget $target): self
+    {
+        return new self([
+            'docker',
+            'pull',
+            '--quiet',
+            '--',
+            self::getImageIdentifier($target),
+        ]);
+    }
+
     public static function stopDatabase(DatabaseInstance $instance): self
     {
         self::validateContainerName($instance->containerName);

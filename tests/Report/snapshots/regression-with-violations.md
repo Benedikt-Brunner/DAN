@@ -32,3 +32,18 @@ Median wall time per mirrored block pair. "Order" is which implementation ran fi
 | product.deep-read / S / mysql-8.0 | 1 | B, A | 12.50ms | 19.40ms | +55.2% |
 | product.keyword-listing / S / mysql-8.0 | 0 | A, B | 8.10ms | 8.60ms | +6.2% |
 | product.keyword-listing / S / mysql-8.0 | 1 | B, A | 8.30ms | 8.00ms | -3.6% |
+
+## Reproducibility
+
+| | A (baseline) | B (candidate) |
+|---|---|---|
+| DAN revision | `dddddddddddd` | `dddddddddddd` |
+| PHP | 8.4.24 | 8.4.24 |
+| Composer | 2.10.3 | 2.10.3 |
+| Host | Linux 6.8.0-1021-azure, x86_64 | Linux 6.8.0-1021-azure, x86_64 |
+| Host CPU | AMD EPYC 7763 64-Core Processor | AMD EPYC 7763 64-Core Processor |
+| Host CPU limit | unknown | unknown |
+| Host memory limit | unknown | unknown |
+| Docker engine | 29.5.2 on Ubuntu 24.04.4 LTS, x86_64, 4 CPUs, 15.6 GiB | 29.5.2 on Ubuntu 24.04.4 LTS, x86_64, 4 CPUs, 15.6 GiB |
+| Database network path | published-port (kernel NAT, userland proxy disabled) | published-port (kernel NAT, userland proxy disabled) |
+| Database images | mysql-8.0 @ `sha256:7dcddc01f13b` | mysql-8.0 @ `sha256:7dcddc01f13b` |

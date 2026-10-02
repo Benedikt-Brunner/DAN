@@ -30,7 +30,8 @@ final class SqliteIndexer
                 created_at TEXT NOT NULL,
                 implementation_identity TEXT NOT NULL,
                 implementation_label TEXT NOT NULL,
-                protocol_json TEXT NOT NULL
+                protocol_json TEXT NOT NULL,
+                environment_json TEXT NOT NULL
             );
             CREATE TABLE cell (
                 scenario TEXT NOT NULL,
@@ -75,12 +76,13 @@ final class SqliteIndexer
             );
             SQL);
 
-        $pdo->prepare('INSERT INTO run VALUES (?, ?, ?, ?, ?)')->execute([
+        $pdo->prepare('INSERT INTO run VALUES (?, ?, ?, ?, ?, ?)')->execute([
             $manifest->runId,
             $manifest->createdAt->format(DateTimeInterface::ATOM),
             $manifest->implementationIdentity->id,
             $manifest->implementationIdentity->label,
             json_encode($manifest->protocol->toArray(), \JSON_THROW_ON_ERROR),
+            json_encode($manifest->environment->toArray(), \JSON_THROW_ON_ERROR),
         ]);
 
         $insertCell = $pdo->prepare('INSERT INTO cell VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
