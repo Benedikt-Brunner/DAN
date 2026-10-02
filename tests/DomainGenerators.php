@@ -17,6 +17,7 @@ use Dan\Harness\RunStore\Artifact\RunManifest;
 use Dan\Harness\RunStore\Artifact\StatementProfile;
 use Dan\Harness\RunStore\Artifact\StatementProfileCollection;
 use Dan\Lib\Protocol\ScenarioName;
+use Dan\Lib\Protocol\StatementDivergence;
 use Dan\Lib\Protocol\Tier;
 use DateTimeImmutable;
 use Eris\Generator;
@@ -107,9 +108,10 @@ final class DomainGenerators
     }
 
     /**
-     * The statement sequence of a scenario: SQL plus the divergence flag per
-     * position. One sequence per cell - every block of a cell records the
-     * same scenario, so blocks share the sequence and differ in samples.
+     * The statement sequence of a scenario: SQL plus whether the SQL text
+     * varied between iterations, per position. One sequence per cell - every
+     * block of a cell records the same scenario, so blocks share the sequence
+     * and differ in samples and observation counts.
      *
      * @return Generator<mixed>
      */
@@ -158,17 +160,25 @@ final class DomainGenerators
     }
 
     /**
-     * Per-block warmup count, wall samples, and one duration sample list per
-     * statement position.
+     * Per-block warmup count, wall samples (one per iteration), and per
+     * statement position the duration samples of the iterations that
+     * produced it - a position may be missing from some iterations, never
+     * present in more iterations than the block ran.
      *
      * @return Generator<mixed>
      */
     private static function blockSamples(int $statementCount): Generator
     {
-        return Generator\tuple(
-            Generator\choose(0, 5),
+        return Generator\bind(
             self::samples(),
-            Generator\vector($statementCount, self::samples()),
+            fn (array $wallSamples): Generator => Generator\tuple(
+                Generator\choose(0, 5),
+                Generator\constant($wallSamples),
+                Generator\vector($statementCount, Generator\tuple(
+                    Generator\vector(count($wallSamples), Generator\choose(0, 5_000_000_000)),
+                    Generator\choose(0, count($wallSamples) - 1),
+                )),
+            ),
         );
     }
 
@@ -439,19 +449,24 @@ final class DomainGenerators
     }
 
     /**
-     * @param array<mixed> $shapes statement shapes (sql, divergent)
-     * @param array<mixed> $durations one duration sample list per shape
+     * @param array<mixed> $shapes statement shapes (sql, text differs)
+     * @param array<mixed> $observations per shape: duration samples for every iteration plus how many iterations missed the position
+     * @param int $iterations the block's measured iterations
      */
-    private static function buildStatementProfiles(array $shapes, array $durations): StatementProfileCollection
+    private static function buildStatementProfiles(array $shapes, array $observations, int $iterations): StatementProfileCollection
     {
         $profiles = [];
         foreach (array_values($shapes) as $index => $shape) {
             $parts = self::asList($shape);
+            $observation = self::asList($observations[$index] ?? null);
+            $missing = self::asInt($observation[1]);
+            $durations = array_slice(self::asIntList($observation[0]), 0, $iterations - $missing);
             $profiles[] = new StatementProfile(
                 index: $index,
                 sql: self::asString($parts[0]),
-                durationSamples: SampleCollection::fromArray(self::asIntList($durations[$index] ?? null)),
-                divergent: self::asBool($parts[1]),
+                durationSamples: SampleCollection::fromArray($durations),
+                observed: count($durations),
+                divergence: StatementDivergence::fromFlags(textDiffers: self::asBool($parts[1]), intermittent: $missing > 0),
             );
         }
 
@@ -469,12 +484,13 @@ final class DomainGenerators
         $results = [];
         foreach (array_values($blocks) as $blockIndex => $block) {
             $parts = self::asList($block);
+            $wallSamples = self::asIntList($parts[1]);
             $results[] = new BlockResult(
                 blockIndex: $blockIndex,
                 executionOrder: self::mirroredExecutionOrder(blockIndex: $blockIndex, slotPosition: $slotPosition),
                 warmupIterations: self::asInt($parts[0]),
-                wallSamples: SampleCollection::fromArray(self::asIntList($parts[1])),
-                statements: self::buildStatementProfiles(shapes: $shapes, durations: self::asList($parts[2])),
+                wallSamples: SampleCollection::fromArray($wallSamples),
+                statements: self::buildStatementProfiles(shapes: $shapes, observations: self::asList($parts[2]), iterations: count($wallSamples)),
             );
         }
 

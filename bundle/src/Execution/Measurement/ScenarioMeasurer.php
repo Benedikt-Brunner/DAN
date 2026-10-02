@@ -70,7 +70,7 @@ final readonly class ScenarioMeasurer
             measuredIterations: $iterations,
             wallSamplesNs: $wallSamplesNs,
             statements: array_map(
-                fn (StatementMeasurementAccumulator $statement) => $statement->result(),
+                fn (StatementMeasurementAccumulator $statement) => $statement->result($iterations),
                 array_values($statements),
             ),
         );

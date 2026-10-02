@@ -94,7 +94,7 @@ final class PolicyTest extends TestCase
             baselineP95Wall: Duration::fromNs(12_000_000),
             candidateP95Wall: Duration::fromNs(12_000_000),
             wallShift: $shift,
-            divergent: false,
+            unstableStatements: [],
             blocks: [],
         );
     }

@@ -19,7 +19,8 @@
                 395000,
                 402000
             ],
-            "divergent": false
+            "observed": 3,
+            "divergence": "none"
         },
         {
             "index": 1,
@@ -29,7 +30,8 @@
                 305000,
                 322000
             ],
-            "divergent": true
+            "observed": 2,
+            "divergence": "text-and-presence"
         }
     ]
 }

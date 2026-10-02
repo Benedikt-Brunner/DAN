@@ -79,18 +79,25 @@ final readonly class BlockResultCollection extends Collection
     }
 
     /**
-     * The cell's statement sequence with duration samples pooled across
-     * blocks, position by position. Divergence between blocks is carried by
-     * the statement profiles' own merge.
+     * The cell's statement sequence with duration samples and observations
+     * pooled across blocks, position by position. SQL differing between
+     * blocks is carried by the profiles' own merge; presence is judged
+     * against the pooled iteration count, so a position that one block never
+     * produced at all reads as intermittent in the pooled view.
      */
     public function pooledStatements(): StatementProfileCollection
     {
         $pooled = StatementProfileCollection::create([]);
+        $iterations = 0;
         foreach ($this as $block) {
             $pooled = $pooled->merge($block->statements);
+            $iterations += $block->iterations();
         }
 
-        return $pooled;
+        return StatementProfileCollection::create(array_map(
+            fn (StatementProfile $statement): StatementProfile => $statement->withPresenceAgainst($iterations),
+            $pooled->getItems(),
+        ));
     }
 
     /** @return list<BlockResultPayload> */

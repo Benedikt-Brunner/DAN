@@ -7,6 +7,7 @@ namespace Dan\Harness\Tests\Comparison;
 use Dan\Harness\Comparison\RunComparator;
 use Dan\Harness\Measurement\Result\MedianShiftEstimator;
 use Dan\Harness\Measurement\Result\SampleCollection;
+use Dan\Harness\Measurement\Scheduling\RunSlot;
 use Dan\Harness\RunStore\Artifact\BlockResult;
 use Dan\Harness\RunStore\Artifact\BlockResultCollection;
 use Dan\Harness\RunStore\Artifact\CellId;
@@ -18,6 +19,7 @@ use Dan\Harness\RunStore\Filesystem\RunDirectory;
 use Dan\Harness\Tests\DomainGenerators;
 use Dan\Harness\Tests\PropertyTestCase;
 use Dan\Lib\Filesystem\Path;
+use Dan\Lib\Protocol\StatementDivergence;
 use Eris\Generator;
 use FilesystemIterator;
 use RecursiveDirectoryIterator;
@@ -65,7 +67,7 @@ final class RunComparatorPropertyTest extends PropertyTestCase
                         self::assertSame($cell->baselineP95Wall->toNsFloat(), $cell->candidateP95Wall->toNsFloat());
                         // Divergence recorded within a run must surface, and
                         // a clean run must never invent one.
-                        self::assertSame($this->anyStatementDivergent($written[$fileName]), $cell->divergent, $fileName);
+                        self::assertSame($this->anyStatementDivergent($written[$fileName]), $cell->hasUnstableStatements(), $fileName);
                         // Every block pairs with itself and agrees perfectly.
                         self::assertCount(count($written[$fileName]->blocks), $cell->blocks);
                         foreach ($cell->blocks as $block) {
@@ -103,7 +105,9 @@ final class RunComparatorPropertyTest extends PropertyTestCase
                     self::assertCount(1, $comparison->cells);
                     self::assertSame($changedPositions !== [], $comparison->cells[0]->sqlChanged);
                     self::assertSame($changedPositions, $comparison->cells[0]->changedStatementIndices);
-                    self::assertTrue($comparison->cells[0]->divergent, 'A divergence flag on either side must surface.');
+                    self::assertTrue($comparison->cells[0]->hasUnstableStatements(), 'A divergence flag on either side must surface.');
+                    $unstableSlots = array_map(fn ($instability) => $instability->slot, $comparison->cells[0]->unstableStatements);
+                    self::assertContains($candidateCarriesDivergence ? RunSlot::Candidate : RunSlot::Baseline, $unstableSlots);
                 });
             },
         );
@@ -223,7 +227,8 @@ final class RunComparatorPropertyTest extends PropertyTestCase
                     index: $statement->index,
                     sql: in_array($index, $positions, true) ? $statement->sql . ' AND rewritten = 1' : $statement->sql,
                     durationSamples: $statement->durationSamples,
-                    divergent: $divergent,
+                    observed: $statement->observed,
+                    divergence: StatementDivergence::fromFlags(textDiffers: $divergent, intermittent: false),
                 );
             }
             $blocks[] = new BlockResult(
@@ -246,7 +251,7 @@ final class RunComparatorPropertyTest extends PropertyTestCase
     private function anyStatementDivergent(CellResult $cell): bool
     {
         foreach ($cell->statements() as $statement) {
-            if ($statement->divergent) {
+            if ($statement->divergence->isDivergent()) {
                 return true;
             }
         }

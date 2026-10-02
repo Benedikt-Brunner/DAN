@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Dan\Probe\Tests\Execution\Result;
 
+use Dan\Lib\Protocol\StatementDivergence;
 use Dan\Probe\Execution\Result\ScenarioResult;
 use Dan\Probe\Execution\Result\StatementResult;
 use PHPUnit\Framework\TestCase;
@@ -39,7 +40,8 @@ final class ScenarioResultContractTest extends TestCase
                         395000,
                         402000,
                     ],
-                    divergent: false,
+                    observed: 3,
+                    divergence: StatementDivergence::None,
                 ),
                 new StatementResult(
                     index: 1,
@@ -49,7 +51,8 @@ final class ScenarioResultContractTest extends TestCase
                         305000,
                         322000,
                     ],
-                    divergent: true,
+                    observed: 2,
+                    divergence: StatementDivergence::TextAndPresence,
                 ),
             ],
         );

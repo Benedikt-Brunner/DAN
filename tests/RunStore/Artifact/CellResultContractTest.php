@@ -9,6 +9,7 @@ use Dan\Harness\Measurement\Scheduling\RunSlot;
 use Dan\Harness\Protocol\DatabaseTarget;
 use Dan\Harness\Protocol\Engine;
 use Dan\Harness\RunStore\Artifact\CellResult;
+use Dan\Lib\Protocol\StatementDivergence;
 use Dan\Lib\Protocol\Tier;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -52,7 +53,8 @@ final class CellResultContractTest extends TestCase
             395000,
             402000,
         ], $statements[0]->durationSamples->toNsArray());
-        self::assertFalse($statements[0]->divergent);
+        self::assertSame(3, $statements[0]->observed);
+        self::assertSame(StatementDivergence::None, $statements[0]->divergence);
         self::assertSame(1, $statements[1]->index);
         self::assertSame('SELECT `category`.`id`, `category`.`name` FROM `category` WHERE `category`.`id` = ?', $statements[1]->sql);
         self::assertSame([
@@ -60,7 +62,8 @@ final class CellResultContractTest extends TestCase
             305000,
             322000,
         ], $statements[1]->durationSamples->toNsArray());
-        self::assertTrue($statements[1]->divergent);
+        self::assertSame(2, $statements[1]->observed);
+        self::assertSame(StatementDivergence::TextAndPresence, $statements[1]->divergence);
     }
 
     /**
