@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Dan\Harness\Protocol;
 
+use Dan\Lib\Collections\Set;
 use Dan\Lib\Protocol\Tier;
 use InvalidArgumentException;
 
@@ -17,6 +18,7 @@ final class ProtocolResolver
         array $databaseSpecs,
         array $tiers,
         int $warmupIterations,
+        int $blockWarmupIterations,
         int $measuredIterations,
         int $blocks,
         ?string $scenarioFilter,
@@ -28,7 +30,7 @@ final class ProtocolResolver
             throw new InvalidArgumentException('At least one --tier is required (S, M or L).');
         }
         $resolvedTiers = [];
-        foreach (array_values(array_unique($tiers)) as $tier) {
+        foreach (Set::create($tiers) as $tier) {
             $resolvedTiers[] = Tier::tryFrom($tier) ?? throw new InvalidArgumentException(sprintf('Unknown tier "%s", expected one of: %s.', $tier, implode(', ', array_map(fn (Tier $t) => $t->value, Tier::cases()))));
         }
         if ($measuredIterations < 1) {
@@ -36,6 +38,9 @@ final class ProtocolResolver
         }
         if ($warmupIterations < 0) {
             throw new InvalidArgumentException('--warmup must be zero or more.');
+        }
+        if ($blockWarmupIterations < 0) {
+            throw new InvalidArgumentException('--block-warmup must be zero or more.');
         }
         if ($blocks < 1) {
             throw new InvalidArgumentException('--blocks must be at least 1.');
@@ -48,6 +53,7 @@ final class ProtocolResolver
             databases: array_map(DatabaseTarget::fromString(...), array_values($databaseSpecs)),
             tiers: $resolvedTiers,
             warmupIterations: $warmupIterations,
+            blockWarmupIterations: $blockWarmupIterations,
             measuredIterations: $measuredIterations,
             blocks: $blocks,
             scenarioFilter: $scenarioFilter,

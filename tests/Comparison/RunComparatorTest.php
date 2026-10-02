@@ -117,6 +117,7 @@ final class RunComparatorTest extends TestCase
             databases: [$database],
             tiers: [Tier::S],
             warmupIterations: 1,
+            blockWarmupIterations: 2,
             measuredIterations: 3,
             blocks: 1,
             scenarioFilter: null,

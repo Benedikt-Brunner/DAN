@@ -9,7 +9,7 @@
 > [!WARNING]
 > The two runs were recorded under **different protocols**. Latency comparisons below are not meaningful.
 
-Protocol: 5 warmup + 30 measured iterations in 4 blocks.
+Protocol: 5 warmup + 30 measured iterations in 4 blocks, 2 warmup at the start of every block.
 
 Cells only present in run A: `product.deep-read--S--mysql-8.0.json`
 

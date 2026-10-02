@@ -192,6 +192,7 @@ final class MarkdownReportSnapshotTest extends TestCase
             databases: [new DatabaseTarget(engine: Engine::MySql, version: '8.0')],
             tiers: [Tier::S],
             warmupIterations: 5,
+            blockWarmupIterations: 2,
             measuredIterations: $measuredIterations,
             blocks: 4,
             scenarioFilter: null,

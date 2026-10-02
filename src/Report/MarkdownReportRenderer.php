@@ -78,10 +78,11 @@ final class MarkdownReportRenderer
 
         $markdown
             ->line(sprintf(
-                'Protocol: %d warmup + %d measured iterations in %d blocks%s.',
+                'Protocol: %d warmup + %d measured iterations in %d blocks, %d warmup at the start of every block%s.',
                 $protocol->warmupIterations,
                 $protocol->measuredIterations,
                 $protocol->blocks,
+                $protocol->blockWarmupIterations,
                 $scenarioFilter,
             ))
             ->blankLine();

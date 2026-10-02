@@ -152,6 +152,7 @@ final class DomainGenerators
                     Tier::cases(),
                 ),
                 Generator\choose(0, 50),
+                Generator\choose(0, 5),
                 Generator\choose(1, 1000),
                 Generator\choose(1, 1000),
                 Generator\elements(null, 'product.*', 'deep-read', ''),
@@ -444,15 +445,16 @@ final class DomainGenerators
      */
     private static function buildProtocol(array $parts): Protocol
     {
-        $measuredIterations = self::asInt($parts[3]);
+        $measuredIterations = self::asInt($parts[4]);
 
         return new Protocol(
             databases: self::asDatabaseTargets($parts[0]),
             tiers: self::asTiers($parts[1]),
             warmupIterations: self::asInt($parts[2]),
+            blockWarmupIterations: self::asInt($parts[3]),
             measuredIterations: $measuredIterations,
-            blocks: max(1, min(self::asInt($parts[4]), $measuredIterations)),
-            scenarioFilter: self::asStringOrNull($parts[5]),
+            blocks: max(1, min(self::asInt($parts[5]), $measuredIterations)),
+            scenarioFilter: self::asStringOrNull($parts[6]),
         );
     }
 

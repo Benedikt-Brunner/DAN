@@ -12,7 +12,7 @@ bin/dan run \
     --dal "$DAL_VERSION" --dal "$DAL_VERSION" \
     --db mysql:8.0 \
     --tier S \
-    --iterations 3 --warmup 1 --blocks 1 \
+    --iterations 3 --warmup 1 --block-warmup 1 --blocks 1 \
     --filter product.deep-read \
     --out "$OUT_DIR" \
     --max-regression 100 --fail-on-sql-change
