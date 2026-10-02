@@ -6,6 +6,7 @@ namespace Dan\Harness\RunStore\Artifact;
 
 use Dan\Harness\Measurement\Result\SampleCollection;
 use Dan\Lib\Collections\Collection;
+use Dan\Lib\Protocol\ResultSet;
 use RuntimeException;
 
 /**
@@ -63,6 +64,36 @@ final readonly class BlockResultCollection extends Collection
             ...$this->getItems(),
             ...$other->getItems(),
         ]);
+    }
+
+    /**
+     * What the scenario returned, as recorded by the earliest block.
+     */
+    public function resultSet(): ResultSet
+    {
+        $first = $this->getItems()[0] ?? throw new RuntimeException('A cell without measurement blocks has no result set.');
+
+        return $first->resultSet;
+    }
+
+    /**
+     * True only when every block saw the same result in every one of its
+     * iterations - the precondition for calling the recorded result "the"
+     * result of this implementation against this dataset.
+     */
+    public function resultSetConsistent(): bool
+    {
+        $first = $this->getItems()[0] ?? null;
+        if ($first === null) {
+            return true;
+        }
+        foreach ($this as $block) {
+            if (!$block->resultSetConsistent || !$block->resultSet->equals($first->resultSet)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

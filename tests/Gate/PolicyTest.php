@@ -7,12 +7,14 @@ namespace Dan\Harness\Tests\Gate;
 use Dan\Harness\Comparison\AlignedStatement;
 use Dan\Harness\Comparison\AlignmentKind;
 use Dan\Harness\Comparison\CellComparison;
+use Dan\Harness\Comparison\ResultSetComparison;
 use Dan\Harness\Comparison\StatementAlignment;
 use Dan\Harness\Gate\Policy;
 use Dan\Harness\Gate\ViolationKind;
 use Dan\Harness\Measurement\Result\MedianShift;
 use Dan\Harness\Protocol\DatabaseTarget;
 use Dan\Harness\Protocol\Engine;
+use Dan\Lib\Protocol\ResultSet;
 use Dan\Lib\Protocol\ScenarioName;
 use Dan\Lib\Protocol\Tier;
 use Dan\Lib\Time\Duration;
@@ -65,6 +67,49 @@ final class PolicyTest extends TestCase
         self::assertSame([], $violations);
     }
 
+    public function testADivergentResultViolatesRegardlessOfEveryOtherSetting(): void
+    {
+        // No latency limit, SQL changes tolerated, and the candidate is
+        // faster: correctness still fails the gate, and it is listed first.
+        $policy = new Policy(maxWallRegressionPct: null, failOnSqlChange: false);
+
+        $violations = $policy->evaluate([
+            self::cell(
+                shift: new MedianShift(estimatePct: -40.0, lowerPct: -45.0, upperPct: -35.0, confidence: 0.95, resamples: 1000),
+                resultSets: new ResultSetComparison(
+                    baseline: new ResultSet(ids: [
+                        'a',
+                        'b',
+                    ], total: 2),
+                    candidate: new ResultSet(ids: ['a'], total: 1),
+                    baselineConsistent: true,
+                    candidateConsistent: true,
+                ),
+            ),
+        ]);
+
+        self::assertCount(1, $violations);
+        self::assertSame(ViolationKind::ResultDivergence, $violations[0]->kind);
+    }
+
+    public function testARunWithVaryingResultsIsNotEquivalentToAnything(): void
+    {
+        $violations = (new Policy(maxWallRegressionPct: null, failOnSqlChange: false))->evaluate([
+            self::cell(
+                shift: new MedianShift(estimatePct: 0.0, lowerPct: -1.0, upperPct: 1.0, confidence: 0.95, resamples: 1000),
+                resultSets: new ResultSetComparison(
+                    baseline: new ResultSet(ids: ['a'], total: 1),
+                    candidate: new ResultSet(ids: ['a'], total: 1),
+                    baselineConsistent: true,
+                    candidateConsistent: false,
+                ),
+            ),
+        ]);
+
+        self::assertCount(1, $violations);
+        self::assertSame(ViolationKind::ResultDivergence, $violations[0]->kind);
+    }
+
     public function testWithoutALatencyLimitOnlySqlChangesCanViolate(): void
     {
         $policy = new Policy(maxWallRegressionPct: null, failOnSqlChange: true);
@@ -80,14 +125,20 @@ final class PolicyTest extends TestCase
     /**
      * @param list<int> $changedIndices
      */
-    private static function cell(MedianShift $shift, array $changedIndices = []): CellComparison
+    private static function cell(MedianShift $shift, array $changedIndices = [], ?ResultSetComparison $resultSets = null): CellComparison
     {
+        $resultSet = new ResultSet(ids: [
+            'a',
+            'b',
+        ], total: 2);
+
         return new CellComparison(
             scenario: ScenarioName::fromString('product.deep-read'),
             tier: Tier::S,
             database: new DatabaseTarget(engine: Engine::MySql, version: '8.0'),
             baselineStatementCount: 4,
             candidateStatementCount: 4,
+            resultSets: $resultSets ?? new ResultSetComparison(baseline: $resultSet, candidate: $resultSet, baselineConsistent: true, candidateConsistent: true),
             alignment: new StatementAlignment(array_map(
                 fn (int $index): AlignedStatement => new AlignedStatement(
                     kind: in_array($index, $changedIndices, true) ? AlignmentKind::Modified : AlignmentKind::Unchanged,

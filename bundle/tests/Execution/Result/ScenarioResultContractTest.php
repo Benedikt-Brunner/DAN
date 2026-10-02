@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Dan\Probe\Tests\Execution\Result;
 
+use Dan\Lib\Protocol\ResultSet;
 use Dan\Lib\Protocol\StatementDivergence;
 use Dan\Probe\Execution\Result\ScenarioResult;
 use Dan\Probe\Execution\Result\StatementResult;
@@ -26,6 +27,11 @@ final class ScenarioResultContractTest extends TestCase
             dalVersion: 'v6.6.10.22',
             warmupIterations: 1,
             measuredIterations: 3,
+            resultSet: new ResultSet(ids: [
+                '0190d3d0a1b74a1c9f0e7b2c6d5e4f30',
+                '0190d3d0a1b74a1c9f0e7b2c6d5e4f31',
+            ], total: 2),
+            resultSetConsistent: true,
             wallSamplesNs: [
                 1250000,
                 1190000,

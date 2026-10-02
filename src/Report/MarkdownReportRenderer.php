@@ -37,6 +37,7 @@ final class MarkdownReportRenderer
         );
         $this->appendProtocol(markdown: $markdown, comparison: $comparison);
         $this->appendViolations(markdown: $markdown, violations: $violations);
+        $this->appendResultDivergence(markdown: $markdown, cells: $comparison->cells);
         $this->appendCellTables(markdown: $markdown, cells: $comparison->cells);
         $this->appendBlockDiagnostics(markdown: $markdown, cells: $comparison->cells);
         $this->appendMissingCells(markdown: $markdown, side: 'A', cells: $comparison->cellsOnlyInBaseline);
@@ -113,6 +114,58 @@ final class MarkdownReportRenderer
     }
 
     /**
+     * Correctness comes before performance: a cell whose implementations
+     * returned different results is listed here, ahead of every latency
+     * table, with what exactly differed.
+     *
+     * @param list<CellComparison> $cells
+     */
+    private function appendResultDivergence(MarkdownBuilder $markdown, array $cells): void
+    {
+        $diverging = array_values(array_filter($cells, fn (CellComparison $cell): bool => !$cell->resultSets->equivalent()));
+        if ($diverging === []) {
+            return;
+        }
+
+        $markdown
+            ->heading('Result divergence')
+            ->blankLine()
+            ->line('> [!CAUTION]')
+            ->line('> The two implementations did not return the same result for these cells. Their latency deltas compare different work and must not be read as performance.')
+            ->blankLine();
+        foreach ($diverging as $cell) {
+            $markdown->line(sprintf(
+                '- %s / %s / %s: %s',
+                $cell->scenario->toString(),
+                $cell->tier->value,
+                $cell->database->id(),
+                $this->describeResultDivergence($cell),
+            ));
+        }
+        $markdown->blankLine();
+    }
+
+    private function describeResultDivergence(CellComparison $cell): string
+    {
+        $resultSets = $cell->resultSets;
+        $facts = [];
+        if ($resultSets->idsDiffer()) {
+            $facts[] = sprintf('different ids (%d in A, %d in B)', count($resultSets->baseline->ids), count($resultSets->candidate->ids));
+        }
+        if ($resultSets->orderDiffers()) {
+            $facts[] = 'same ids in a different order';
+        }
+        if ($resultSets->totalDiffers()) {
+            $facts[] = sprintf('total %d in A, %d in B', $resultSets->baseline->total, $resultSets->candidate->total);
+        }
+        foreach ($resultSets->inconsistentRuns() as $slot) {
+            $facts[] = sprintf('%s returned varying results between its own iterations', $slot === RunSlot::Baseline ? 'A' : 'B');
+        }
+
+        return implode('; ', $facts);
+    }
+
+    /**
      * @param list<CellComparison> $cells
      */
     private function appendCellTables(MarkdownBuilder $markdown, array $cells): void
@@ -123,6 +176,7 @@ final class MarkdownReportRenderer
                 ->blankLine()
                 ->tableRow([
                     'Scenario',
+                    'Result',
                     'Statements',
                     'SQL',
                     'Median A',
@@ -131,7 +185,7 @@ final class MarkdownReportRenderer
                     'p95 A',
                     'p95 B',
                 ])
-                ->line('|---|---|---|---:|---:|---:|---:|---:|');
+                ->line('|---|---|---|---|---:|---:|---:|---:|---:|');
 
             $p95IndicativeOnly = false;
             foreach ($groupCells as $cell) {
@@ -191,6 +245,7 @@ final class MarkdownReportRenderer
 
         return [
             $cell->scenario->toString(),
+            $cell->resultSets->equivalent() ? 'identical' : ':x: differs',
             sprintf('%d -> %d', $cell->baselineStatementCount, $cell->candidateStatementCount),
             $sqlStatus,
             sprintf('%.2fms', $cell->baselineMedianWall->toMsFloat()),
@@ -333,6 +388,11 @@ final class MarkdownReportRenderer
         $cellName = sprintf('%s / %s / %s', $cell->scenario->toString(), $cell->tier->value, $cell->database->id());
 
         return match ($violation->kind) {
+            ViolationKind::ResultDivergence => sprintf(
+                '%s: the implementations returned different results (%s)',
+                $cellName,
+                $this->describeResultDivergence($cell),
+            ),
             ViolationKind::SqlChanged => sprintf(
                 '%s: generated SQL changed (%s)',
                 $cellName,

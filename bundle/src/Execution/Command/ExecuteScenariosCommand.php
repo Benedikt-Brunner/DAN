@@ -44,6 +44,13 @@ final class ExecuteScenariosCommand extends Command
     {
         $iterations = $this->intOption(input: $input, name: 'iterations');
         $warmup = $this->intOption(input: $input, name: 'warmup');
+        if ($iterations < 1) {
+            // A block without a measured iteration records nothing - not
+            // even the result set the comparison rests on.
+            $output->writeln('<error>--iterations must be at least 1.</error>');
+
+            return Command::INVALID;
+        }
         $outputDir = $input->getOption('output-dir');
         if (!is_string($outputDir)) {
             $output->writeln('<error>--output-dir is required.</error>');

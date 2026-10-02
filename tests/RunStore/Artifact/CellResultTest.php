@@ -39,6 +39,12 @@ final class CellResultTest extends TestCase
         self::assertSame(3, $cell->blocks[0]->executionOrder);
         self::assertSame(2, $cell->blocks[0]->warmupIterations);
         self::assertSame(2, $cell->blocks[0]->iterations());
+        self::assertSame([
+            '0190d3d0a1b74a1c9f0e7b2c6d5e4f30',
+            '0190d3d0a1b74a1c9f0e7b2c6d5e4f31',
+        ], $cell->resultSet()->ids);
+        self::assertSame(2, $cell->resultSet()->total);
+        self::assertTrue($cell->resultSetConsistent());
     }
 
     public function testRefusesAResultWhoseMeasuredIterationsDisagreeWithTheSchedule(): void
@@ -131,6 +137,36 @@ final class CellResultTest extends TestCase
             ['measuredIterations'],
             2.0,
         ];
+        yield 'result set' => [
+            ['resultSet'],
+            'none',
+        ];
+        yield 'result ids' => [
+            [
+                'resultSet',
+                'ids',
+            ],
+            'a,b',
+        ];
+        yield 'result id' => [
+            [
+                'resultSet',
+                'ids',
+                0,
+            ],
+            17,
+        ];
+        yield 'result total' => [
+            [
+                'resultSet',
+                'total',
+            ],
+            '2',
+        ];
+        yield 'result consistency' => [
+            ['resultSetConsistent'],
+            'yes',
+        ];
         yield 'wall samples' => [
             ['wallNsSamples'],
             'none',
@@ -188,6 +224,14 @@ final class CellResultTest extends TestCase
             'dalVersion' => 'v6.6.10.22',
             'warmupIterations' => 2,
             'measuredIterations' => 2,
+            'resultSet' => [
+                'ids' => [
+                    '0190d3d0a1b74a1c9f0e7b2c6d5e4f30',
+                    '0190d3d0a1b74a1c9f0e7b2c6d5e4f31',
+                ],
+                'total' => 2,
+            ],
+            'resultSetConsistent' => true,
             'wallNsSamples' => [
                 1_000_000,
                 1_100_000,

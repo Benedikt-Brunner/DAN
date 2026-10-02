@@ -42,6 +42,9 @@ final class SqliteIndexer
                 median_wall_ms REAL NOT NULL,
                 p95_wall_ms REAL NOT NULL,
                 divergent INTEGER NOT NULL,
+                result_id_count INTEGER NOT NULL,
+                result_total INTEGER NOT NULL,
+                result_consistent INTEGER NOT NULL,
                 PRIMARY KEY (scenario, tier, engine, engine_version)
             );
             CREATE TABLE block (
@@ -80,7 +83,7 @@ final class SqliteIndexer
             json_encode($manifest->protocol->toArray(), \JSON_THROW_ON_ERROR),
         ]);
 
-        $insertCell = $pdo->prepare('INSERT INTO cell VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
+        $insertCell = $pdo->prepare('INSERT INTO cell VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
         $insertBlock = $pdo->prepare('INSERT INTO block VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
         $insertStatement = $pdo->prepare('INSERT INTO statement VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
 
@@ -131,6 +134,9 @@ final class SqliteIndexer
                 $wallStatistics->median()->toMsFloat(),
                 $wallStatistics->percentile(Statistics::P95)->toMsFloat(),
                 (int) $divergent,
+                count($cell->resultSet()->ids),
+                $cell->resultSet()->total,
+                (int) $cell->resultSetConsistent(),
             ]);
         }
         $pdo->commit();

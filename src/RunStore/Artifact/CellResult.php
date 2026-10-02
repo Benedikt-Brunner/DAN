@@ -7,6 +7,7 @@ namespace Dan\Harness\RunStore\Artifact;
 use Dan\Harness\Measurement\Result\SampleCollection;
 use Dan\Harness\Measurement\Scheduling\MeasurementBlock;
 use Dan\Harness\Protocol\DatabaseTarget;
+use Dan\Lib\Protocol\ResultSet;
 use Dan\Lib\Protocol\ScenarioName;
 use Dan\Lib\Protocol\ScenarioResultSchemaVersion;
 use Dan\Lib\Protocol\Tier;
@@ -49,6 +50,16 @@ final class CellResult
     public function statements(): StatementProfileCollection
     {
         return $this->blocks->pooledStatements();
+    }
+
+    public function resultSet(): ResultSet
+    {
+        return $this->blocks->resultSet();
+    }
+
+    public function resultSetConsistent(): bool
+    {
+        return $this->blocks->resultSetConsistent();
     }
 
     public function merge(self $other): self
@@ -113,9 +124,11 @@ final class CellResult
         $scenario = $payload['scenario'] ?? null;
         $warmupIterations = $payload['warmupIterations'] ?? null;
         $measuredIterations = $payload['measuredIterations'] ?? null;
+        $resultSet = $payload['resultSet'] ?? null;
+        $resultSetConsistent = $payload['resultSetConsistent'] ?? null;
         $wallSamples = $payload['wallNsSamples'] ?? null;
         $statements = $payload['statements'] ?? null;
-        if (!is_int($schemaVersion) || !is_string($scenario) || !is_int($warmupIterations) || !is_int($measuredIterations) || !is_array($statements)) {
+        if (!is_int($schemaVersion) || !is_string($scenario) || !is_int($warmupIterations) || !is_int($measuredIterations) || !is_array($resultSet) || !is_bool($resultSetConsistent) || !is_array($statements)) {
             throw new RuntimeException('Malformed scenario-result payload.');
         }
         $expected = ScenarioResultSchemaVersion::getCurrent();
@@ -143,6 +156,8 @@ final class CellResult
                     blockIndex: $block->blockIndex,
                     executionOrder: $block->executionOrder,
                     warmupIterations: $warmupIterations,
+                    resultSet: ResultSet::fromDecodedArray($resultSet),
+                    resultSetConsistent: $resultSetConsistent,
                     wallSamples: $wallSamples,
                     statements: StatementProfileCollection::fromDecodedArray($statements),
                 ),

@@ -39,6 +39,12 @@ final class CellResultContractTest extends TestCase
         self::assertSame(1, $cell->blocks[0]->warmupIterations);
         self::assertSame(3, $cell->blocks[0]->iterations());
         self::assertSame([
+            '0190d3d0a1b74a1c9f0e7b2c6d5e4f30',
+            '0190d3d0a1b74a1c9f0e7b2c6d5e4f31',
+        ], $cell->resultSet()->ids);
+        self::assertSame(2, $cell->resultSet()->total);
+        self::assertTrue($cell->resultSetConsistent());
+        self::assertSame([
             1250000,
             1190000,
             1210000,
