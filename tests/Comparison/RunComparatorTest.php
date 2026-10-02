@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Dan\Harness\Tests\Comparison;
 
+use Dan\Harness\Comparison\AlignmentKind;
 use Dan\Harness\Comparison\RunComparator;
 use Dan\Harness\Gate\Policy;
 use Dan\Harness\Implementation\Identity\Identity;
@@ -80,7 +81,7 @@ final class RunComparatorTest extends TestCase
         self::assertTrue($comparison->protocolsMatch);
         self::assertCount(1, $comparison->cells);
         // IN-list arity differences are data-shape noise, not SQL changes.
-        self::assertFalse($comparison->cells[0]->sqlChanged);
+        self::assertFalse($comparison->cells[0]->sqlChanged());
         self::assertSame(0.0, $comparison->cells[0]->wallDeltaPct());
 
         $policy = new Policy(maxWallRegressionPct: 5.0, failOnSqlChange: true);
@@ -102,8 +103,8 @@ final class RunComparatorTest extends TestCase
 
         $comparison = RunComparator::compare(baseline: $baseline, candidate: $candidate);
 
-        self::assertTrue($comparison->cells[0]->sqlChanged);
-        self::assertSame([0], $comparison->cells[0]->changedStatementIndices);
+        self::assertTrue($comparison->cells[0]->sqlChanged());
+        self::assertSame([0], $comparison->cells[0]->alignment->baselineIndices(AlignmentKind::Modified));
         self::assertSame(100.0, $comparison->cells[0]->wallDeltaPct());
 
         $violations = (new Policy(maxWallRegressionPct: 15.0, failOnSqlChange: true))->evaluate($comparison->cells);

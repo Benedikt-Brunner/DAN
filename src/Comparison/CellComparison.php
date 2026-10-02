@@ -13,7 +13,6 @@ use Dan\Lib\Time\Duration;
 final class CellComparison
 {
     /**
-     * @param list<int> $changedStatementIndices
      * @param list<StatementInstability> $unstableStatements positions that diverged within either run
      * @param list<BlockComparison> $blocks per mirrored block pair, in block order
      */
@@ -23,8 +22,7 @@ final class CellComparison
         public readonly DatabaseTarget $database,
         public readonly int $baselineStatementCount,
         public readonly int $candidateStatementCount,
-        public readonly bool $sqlChanged,
-        public readonly array $changedStatementIndices,
+        public readonly StatementAlignment $alignment,
         public readonly int $baselineSampleCount,
         public readonly int $candidateSampleCount,
         public readonly Duration $baselineMedianWall,
@@ -35,6 +33,15 @@ final class CellComparison
         public readonly array $unstableStatements,
         public readonly array $blocks,
     ) {}
+
+    /**
+     * True when the aligned statement sequences differ anywhere - a modified,
+     * inserted, removed or ambiguously aligned statement.
+     */
+    public function sqlChanged(): bool
+    {
+        return $this->alignment->sqlChanged();
+    }
 
     /**
      * True when either run's statement sequence was not identical in every
