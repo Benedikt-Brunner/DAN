@@ -10,6 +10,8 @@ use Dan\Harness\Measurement\Result\SampleCollection;
 use Dan\Harness\Protocol\DatabaseTarget;
 use Dan\Harness\Protocol\Engine;
 use Dan\Harness\Protocol\Protocol;
+use Dan\Harness\RunStore\Artifact\BlockResult;
+use Dan\Harness\RunStore\Artifact\BlockResultCollection;
 use Dan\Harness\RunStore\Artifact\CellResult;
 use Dan\Harness\RunStore\Artifact\RunManifest;
 use Dan\Harness\RunStore\Artifact\StatementProfile;
@@ -104,31 +106,69 @@ final class DomainGenerators
         );
     }
 
-    /** @return Generator<mixed> */
-    public static function statementProfiles(): Generator
+    /**
+     * The statement sequence of a scenario: SQL plus the divergence flag per
+     * position. One sequence per cell - every block of a cell records the
+     * same scenario, so blocks share the sequence and differ in samples.
+     *
+     * @return Generator<mixed>
+     */
+    public static function statementShapes(): Generator
     {
-        return Generator\map(
-            self::buildStatementProfiles(...),
-            self::boundedList(elements: Generator\tuple(
-                Generator\elements(...self::SQL_SHAPES),
-                self::samples(),
-                Generator\bool(),
-            ), maxLength: 6),
-        );
+        return self::boundedList(elements: Generator\tuple(
+            Generator\elements(...self::SQL_SHAPES),
+            Generator\bool(),
+        ), maxLength: 6);
     }
 
-    /** @return Generator<mixed> */
+    /**
+     * A cell with one to three measurement blocks. Execution orders follow
+     * the two-slot mirrored schedule for a randomly chosen slot, so block
+     * index and execution order differ the way they do in real A/B runs.
+     *
+     * @return Generator<mixed>
+     */
     public static function cellResult(): Generator
     {
-        return Generator\map(
-            self::buildCellResult(...),
+        return Generator\bind(
             Generator\tuple(
                 self::scenarioName(),
                 self::tier(),
                 self::databaseTarget(),
-                self::samples(),
-                self::statementProfiles(),
+                self::statementShapes(),
+                Generator\choose(0, 1),
             ),
+            self::cellResultWithBlocks(...),
+        );
+    }
+
+    /**
+     * @param array<mixed> $head scenario, tier, database, statement shapes, slot position
+     *
+     * @return Generator<mixed>
+     */
+    private static function cellResultWithBlocks(array $head): Generator
+    {
+        $statementCount = count(self::asList($head[3]));
+
+        return Generator\map(
+            fn (array $blocks): CellResult => self::buildCellResult(head: $head, blocks: $blocks),
+            self::boundedList(elements: self::blockSamples($statementCount), maxLength: 3),
+        );
+    }
+
+    /**
+     * Per-block warmup count, wall samples, and one duration sample list per
+     * statement position.
+     *
+     * @return Generator<mixed>
+     */
+    private static function blockSamples(int $statementCount): Generator
+    {
+        return Generator\tuple(
+            Generator\choose(0, 5),
+            self::samples(),
+            Generator\vector($statementCount, self::samples()),
         );
     }
 
@@ -346,15 +386,6 @@ final class DomainGenerators
         return array_map(self::asDatabaseTarget(...), self::asList($value));
     }
 
-    public static function asStatementProfiles(mixed $value): StatementProfileCollection
-    {
-        if (!$value instanceof StatementProfileCollection) {
-            throw new LogicException('Generated value is not a StatementProfileCollection.');
-        }
-
-        return $value;
-    }
-
     public static function asReferenceType(mixed $value): ReferenceType
     {
         if (!$value instanceof ReferenceType) {
@@ -408,18 +439,19 @@ final class DomainGenerators
     }
 
     /**
-     * @param array<mixed> $statements
+     * @param array<mixed> $shapes statement shapes (sql, divergent)
+     * @param array<mixed> $durations one duration sample list per shape
      */
-    private static function buildStatementProfiles(array $statements): StatementProfileCollection
+    private static function buildStatementProfiles(array $shapes, array $durations): StatementProfileCollection
     {
         $profiles = [];
-        foreach (array_values($statements) as $index => $statement) {
-            $parts = self::asList($statement);
+        foreach (array_values($shapes) as $index => $shape) {
+            $parts = self::asList($shape);
             $profiles[] = new StatementProfile(
                 index: $index,
                 sql: self::asString($parts[0]),
-                durationSamples: SampleCollection::fromArray(self::asIntList($parts[1])),
-                divergent: self::asBool($parts[2]),
+                durationSamples: SampleCollection::fromArray(self::asIntList($durations[$index] ?? null)),
+                divergent: self::asBool($parts[1]),
             );
         }
 
@@ -427,17 +459,40 @@ final class DomainGenerators
     }
 
     /**
-     * @param array<mixed> $parts
+     * @param array<mixed> $head
+     * @param array<mixed> $blocks
      */
-    private static function buildCellResult(array $parts): CellResult
+    private static function buildCellResult(array $head, array $blocks): CellResult
     {
+        $shapes = self::asList($head[3]);
+        $slotPosition = self::asInt($head[4]);
+        $results = [];
+        foreach (array_values($blocks) as $blockIndex => $block) {
+            $parts = self::asList($block);
+            $results[] = new BlockResult(
+                blockIndex: $blockIndex,
+                executionOrder: self::mirroredExecutionOrder(blockIndex: $blockIndex, slotPosition: $slotPosition),
+                warmupIterations: self::asInt($parts[0]),
+                wallSamples: SampleCollection::fromArray(self::asIntList($parts[1])),
+                statements: self::buildStatementProfiles(shapes: $shapes, durations: self::asList($parts[2])),
+            );
+        }
+
         return new CellResult(
-            scenario: self::asScenarioName($parts[0]),
-            tier: self::asTier($parts[1]),
-            database: self::asDatabaseTarget($parts[2]),
-            wallSamples: SampleCollection::fromArray(self::asIntList($parts[3])),
-            statements: self::asStatementProfiles($parts[4]),
+            scenario: self::asScenarioName($head[0]),
+            tier: self::asTier($head[1]),
+            database: self::asDatabaseTarget($head[2]),
+            blocks: BlockResultCollection::inExecutionOrder($results),
         );
+    }
+
+    /**
+     * The execution position BlockScheduler assigns in a two-slot session:
+     * even blocks run the slots in order, odd blocks mirrored.
+     */
+    public static function mirroredExecutionOrder(int $blockIndex, int $slotPosition): int
+    {
+        return 2 * $blockIndex + ($blockIndex % 2 === 0 ? $slotPosition : 1 - $slotPosition);
     }
 
     /**

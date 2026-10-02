@@ -6,6 +6,8 @@ namespace Dan\Harness\Tests\Comparison;
 
 use Dan\Harness\Comparison\RunComparator;
 use Dan\Harness\Measurement\Result\SampleCollection;
+use Dan\Harness\RunStore\Artifact\BlockResult;
+use Dan\Harness\RunStore\Artifact\BlockResultCollection;
 use Dan\Harness\RunStore\Artifact\CellId;
 use Dan\Harness\RunStore\Artifact\CellResult;
 use Dan\Harness\RunStore\Artifact\RunManifest;
@@ -62,6 +64,12 @@ final class RunComparatorPropertyTest extends PropertyTestCase
                         // Divergence recorded within a run must surface, and
                         // a clean run must never invent one.
                         self::assertSame($this->anyStatementDivergent($written[$fileName]), $cell->divergent, $fileName);
+                        // Every block pairs with itself and agrees perfectly.
+                        self::assertCount(count($written[$fileName]->blocks), $cell->blocks);
+                        foreach ($cell->blocks as $block) {
+                            self::assertSame(0.0, $block->wallDeltaPct());
+                        }
+                        self::assertFalse($cell->blockEffectsDisagree());
                     }
                     self::assertCount(count($written), $baseline->allCells());
                 });
@@ -141,12 +149,20 @@ final class RunComparatorPropertyTest extends PropertyTestCase
                 $this->inRunDirectory(function (RunDirectory $directory) use ($manifest, $cell, $secondBlockWallSamples): void {
                     $directory->initialize($manifest);
                     $id = new CellId(scenario: $cell->scenario, tier: $cell->tier, database: $cell->database);
+                    $lastBlock = $cell->blocks[count($cell->blocks) - 1];
                     $secondBlock = new CellResult(
                         scenario: $cell->scenario,
                         tier: $cell->tier,
                         database: $cell->database,
-                        wallSamples: SampleCollection::fromArray($secondBlockWallSamples),
-                        statements: $cell->statements,
+                        blocks: BlockResultCollection::inExecutionOrder([
+                            new BlockResult(
+                                blockIndex: $lastBlock->blockIndex + 1,
+                                executionOrder: $lastBlock->executionOrder + 2,
+                                warmupIterations: $lastBlock->warmupIterations,
+                                wallSamples: SampleCollection::fromArray($secondBlockWallSamples),
+                                statements: $lastBlock->statements,
+                            ),
+                        ]),
                     );
 
                     $directory->mergeIntoCell(id: $id, result: $cell);
@@ -187,7 +203,7 @@ final class RunComparatorPropertyTest extends PropertyTestCase
                     $cell,
                     array_values($positions),
                 ],
-                Generator\subset(range(0, count($cell->statements) - 1)),
+                Generator\subset(range(0, count($cell->statements()) - 1)),
             ),
         );
     }
@@ -197,13 +213,23 @@ final class RunComparatorPropertyTest extends PropertyTestCase
      */
     private function withRewrittenSql(CellResult $cell, array $positions, bool $divergent): CellResult
     {
-        $statements = [];
-        foreach ($cell->statements as $index => $statement) {
-            $statements[] = new StatementProfile(
-                index: $statement->index,
-                sql: in_array($index, $positions, true) ? $statement->sql . ' AND rewritten = 1' : $statement->sql,
-                durationSamples: $statement->durationSamples,
-                divergent: $divergent,
+        $blocks = [];
+        foreach ($cell->blocks as $block) {
+            $statements = [];
+            foreach ($block->statements as $index => $statement) {
+                $statements[] = new StatementProfile(
+                    index: $statement->index,
+                    sql: in_array($index, $positions, true) ? $statement->sql . ' AND rewritten = 1' : $statement->sql,
+                    durationSamples: $statement->durationSamples,
+                    divergent: $divergent,
+                );
+            }
+            $blocks[] = new BlockResult(
+                blockIndex: $block->blockIndex,
+                executionOrder: $block->executionOrder,
+                warmupIterations: $block->warmupIterations,
+                wallSamples: $block->wallSamples,
+                statements: StatementProfileCollection::create($statements),
             );
         }
 
@@ -211,14 +237,13 @@ final class RunComparatorPropertyTest extends PropertyTestCase
             scenario: $cell->scenario,
             tier: $cell->tier,
             database: $cell->database,
-            wallSamples: $cell->wallSamples,
-            statements: StatementProfileCollection::create($statements),
+            blocks: BlockResultCollection::inExecutionOrder($blocks),
         );
     }
 
     private function anyStatementDivergent(CellResult $cell): bool
     {
-        foreach ($cell->statements as $statement) {
+        foreach ($cell->statements() as $statement) {
             if ($statement->divergent) {
                 return true;
             }

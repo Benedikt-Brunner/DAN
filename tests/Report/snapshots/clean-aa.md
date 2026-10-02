@@ -20,3 +20,16 @@ Protocol: 5 warmup + 30 measured iterations in 4 blocks, 2 warmup at the start o
 |---|---|---|---:|---:|---:|---:|---:|
 | product.deep-read | 4 -> 4 | unchanged | 12.50ms | 12.50ms | +0.0% | 14.10ms | 14.10ms |
 | product.keyword-listing | 4 -> 4 | unchanged | 8.20ms | 8.20ms | +0.0% | 9.90ms | 9.90ms |
+
+## Block diagnostics
+
+Median wall time per mirrored block pair. "Order" is which implementation ran first within the pair; a delta that flips sign between pairs points at an order effect or host drift rather than at the implementation.
+
+| Cell | Block | Order | Median A | Median B | Delta |
+|---|---:|---|---:|---:|---:|
+| product.deep-read / S / mysql-8.0 | 0 | A, B | 12.50ms | 12.50ms | +0.0% |
+| product.deep-read / S / mysql-8.0 | 1 | B, A | 12.50ms | 12.50ms | +0.0% |
+| product.keyword-listing / S / mysql-8.0 | 0 | A, B | 8.20ms | 8.20ms | +0.0% |
+| product.keyword-listing / S / mysql-8.0 | 1 | B, A | 8.20ms | 8.20ms | +0.0% |
+| product.deep-read / M / mariadb-11.4 | 0 | A, B | 47.30ms | 47.30ms | +0.0% |
+| product.deep-read / M / mariadb-11.4 | 1 | B, A | 47.30ms | 47.30ms | +0.0% |

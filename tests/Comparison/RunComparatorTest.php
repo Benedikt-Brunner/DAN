@@ -13,6 +13,8 @@ use Dan\Harness\Measurement\Scheduling\RunSlot;
 use Dan\Harness\Protocol\DatabaseTarget;
 use Dan\Harness\Protocol\Engine;
 use Dan\Harness\Protocol\Protocol;
+use Dan\Harness\RunStore\Artifact\BlockResult;
+use Dan\Harness\RunStore\Artifact\BlockResultCollection;
 use Dan\Harness\RunStore\Artifact\CellId;
 use Dan\Harness\RunStore\Artifact\CellResult;
 use Dan\Harness\RunStore\Artifact\RunManifest;
@@ -107,10 +109,68 @@ final class RunComparatorTest extends TestCase
         self::assertCount(2, $violations);
     }
 
+    public function testPairsBlocksByIndexAndExposesOrderEffects(): void
+    {
+        // Two mirrored block pairs: baseline first in block 0, candidate
+        // first in block 1. The candidate is slower in block 0 and faster in
+        // block 1 - a textbook order effect the pooled delta would hide.
+        $baseline = $this->writeRun(slot: RunSlot::Baseline, wallNs: [
+            10_000_000,
+            10_000_000,
+        ], sql: 'SELECT `id` FROM `product`', blocks: [
+            [
+                0,
+                [
+                    10_000_000,
+                    10_000_000,
+                ],
+            ],
+            [
+                3,
+                [
+                    10_000_000,
+                    10_000_000,
+                ],
+            ],
+        ]);
+        $candidate = $this->writeRun(slot: RunSlot::Candidate, wallNs: [
+            10_000_000,
+            10_000_000,
+        ], sql: 'SELECT `id` FROM `product`', blocks: [
+            [
+                1,
+                [
+                    12_000_000,
+                    12_000_000,
+                ],
+            ],
+            [
+                2,
+                [
+                    8_000_000,
+                    8_000_000,
+                ],
+            ],
+        ]);
+
+        $cell = RunComparator::compare(baseline: $baseline, candidate: $candidate)->cells[0];
+
+        self::assertCount(2, $cell->blocks);
+        self::assertSame(0, $cell->blocks[0]->blockIndex);
+        self::assertTrue($cell->blocks[0]->baselineRanFirst());
+        self::assertSame(20.0, $cell->blocks[0]->wallDeltaPct());
+        self::assertSame(1, $cell->blocks[1]->blockIndex);
+        self::assertFalse($cell->blocks[1]->baselineRanFirst());
+        self::assertSame(-20.0, $cell->blocks[1]->wallDeltaPct());
+        self::assertTrue($cell->blockEffectsDisagree());
+        self::assertSame(0.0, $cell->wallDeltaPct(), 'The pooled medians cancel out - exactly why the per-block view exists.');
+    }
+
     /**
-     * @param list<int> $wallNs integer nanoseconds
+     * @param list<int> $wallNs integer nanoseconds of the single block written when $blocks is empty
+     * @param list<array{int, list<int>}> $blocks execution order plus wall samples per block, in block-index order
      */
-    private function writeRun(RunSlot $slot, array $wallNs, string $sql): RunDirectory
+    private function writeRun(RunSlot $slot, array $wallNs, string $sql, array $blocks = []): RunDirectory
     {
         $database = new DatabaseTarget(engine: Engine::MySql, version: '8.0');
         $protocol = new Protocol(
@@ -132,16 +192,38 @@ final class RunComparatorTest extends TestCase
             implementationIdentity: new Identity(id: 'fp-' . $slot->value, label: 'label ' . $slot->value),
             protocol: $protocol,
         ));
+        if ($blocks === []) {
+            $blocks = [
+                [
+                    $slot === RunSlot::Baseline ? 0 : 1,
+                    $wallNs,
+                ],
+            ];
+        }
+        $blockResults = [];
+        foreach (
+            $blocks as $blockIndex => [
+                $executionOrder,
+                $blockWallNs,
+            ]
+        ) {
+            $blockResults[] = new BlockResult(
+                blockIndex: $blockIndex,
+                executionOrder: $executionOrder,
+                warmupIterations: 1,
+                wallSamples: SampleCollection::fromArray($blockWallNs),
+                statements: StatementProfileCollection::create([
+                    new StatementProfile(index: 0, sql: $sql, durationSamples: SampleCollection::fromArray($blockWallNs), divergent: false),
+                ]),
+            );
+        }
         $run->writeCell(
             id: new CellId(scenario: ScenarioName::fromString('scenario.one'), tier: Tier::S, database: $database),
             result: new CellResult(
                 scenario: ScenarioName::fromString('scenario.one'),
                 tier: Tier::S,
                 database: $database,
-                wallSamples: SampleCollection::fromArray($wallNs),
-                statements: StatementProfileCollection::create([
-                    new StatementProfile(index: 0, sql: $sql, durationSamples: SampleCollection::fromArray($wallNs), divergent: false),
-                ]),
+                blocks: BlockResultCollection::inExecutionOrder($blockResults),
             ),
         );
 

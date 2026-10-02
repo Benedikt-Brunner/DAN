@@ -52,7 +52,13 @@ final class BlockScheduler
                     $warmup += $protocol->warmupIterations;
                     $cellWarmed = $cellWarmed->with($slot);
                 }
-                $plan[] = new MeasurementBlock(slot: $slot, warmupIterations: $warmup, iterations: $iterations, blockIndex: $block);
+                $plan[] = new MeasurementBlock(
+                    slot: $slot,
+                    warmupIterations: $warmup,
+                    iterations: $iterations,
+                    blockIndex: $block,
+                    executionOrder: count($plan),
+                );
             }
         }
 

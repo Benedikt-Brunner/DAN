@@ -66,7 +66,8 @@ final readonly class ScenarioMeasurer
             dalVersion: InstalledVersions::isInstalled('shopware/core')
                 ? InstalledVersions::getPrettyVersion('shopware/core')
                 : null,
-            iterations: $iterations,
+            warmupIterations: $warmup,
+            measuredIterations: $iterations,
             wallSamplesNs: $wallSamplesNs,
             statements: array_map(
                 fn (StatementMeasurementAccumulator $statement) => $statement->result(),

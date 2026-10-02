@@ -53,6 +53,20 @@ final class BlockSchedulerTest extends TestCase
             RunSlot::Candidate,
             RunSlot::Baseline,
         ], $order);
+        // The execution order is the block's position in this very sequence
+        // - it is what lets a cell artifact tell "candidate ran first" apart
+        // from "baseline ran first" within a mirrored pair.
+        self::assertSame(range(0, 7), array_map(fn (MeasurementBlock $block) => $block->executionOrder, $plan));
+        self::assertSame([
+            0,
+            0,
+            1,
+            1,
+            2,
+            2,
+            3,
+            3,
+        ], array_map(fn (MeasurementBlock $block) => $block->blockIndex, $plan));
     }
 
     public function testDistributesRemainderIterationsToEarlyBlocks(): void
