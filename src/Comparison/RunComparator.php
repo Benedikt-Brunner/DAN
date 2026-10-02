@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Dan\Harness\Comparison;
 
+use Dan\Harness\Measurement\Result\MedianShiftEstimator;
+use Dan\Harness\Measurement\Result\SampleCollection;
+use Dan\Harness\Measurement\Result\SamplePair;
 use Dan\Harness\Measurement\Result\Statistics;
 use Dan\Harness\RunStore\Artifact\BlockResult;
 use Dan\Harness\RunStore\Artifact\BlockResultCollection;
@@ -13,7 +16,11 @@ use Dan\Harness\RunStore\Filesystem\RunDirectory;
 
 final class RunComparator
 {
-    public static function compare(RunDirectory $baseline, RunDirectory $candidate): RunComparison
+    /**
+     * The estimator is injectable so tests can trade resamples for speed;
+     * production runs use its defaults.
+     */
+    public static function compare(RunDirectory $baseline, RunDirectory $candidate, MedianShiftEstimator $shiftEstimator = new MedianShiftEstimator()): RunComparison
     {
         $baselineManifest = $baseline->manifest();
         $candidateManifest = $candidate->manifest();
@@ -27,6 +34,7 @@ final class RunComparator
             $cells[] = self::compareCell(
                 baselineCell: $baseline->readCellByFileName($fileName),
                 candidateCell: $candidate->readCellByFileName($fileName),
+                shiftEstimator: $shiftEstimator,
             );
         }
 
@@ -40,7 +48,7 @@ final class RunComparator
         );
     }
 
-    private static function compareCell(CellResult $baselineCell, CellResult $candidateCell): CellComparison
+    private static function compareCell(CellResult $baselineCell, CellResult $candidateCell, MedianShiftEstimator $shiftEstimator): CellComparison
     {
         $baselineStatements = $baselineCell->statements();
         $candidateStatements = $candidateCell->statements();
@@ -63,8 +71,11 @@ final class RunComparator
             fn (bool $carry, StatementProfile $statement) => $carry || $statement->divergent,
             false,
         );
-        $baselineWallStatistics = Statistics::create($baselineCell->wallSamples());
-        $candidateWallStatistics = Statistics::create($candidateCell->wallSamples());
+        $baselineWall = $baselineCell->wallSamples();
+        $candidateWall = $candidateCell->wallSamples();
+        $baselineWallStatistics = Statistics::create($baselineWall);
+        $candidateWallStatistics = Statistics::create($candidateWall);
+        $blocks = self::compareBlocks(baseline: $baselineCell->blocks, candidate: $candidateCell->blocks);
 
         return new CellComparison(
             scenario: $baselineCell->scenario,
@@ -74,12 +85,36 @@ final class RunComparator
             candidateStatementCount: count($candidateStatements),
             sqlChanged: $changedIndices !== [],
             changedStatementIndices: $changedIndices,
+            baselineSampleCount: count($baselineWall),
+            candidateSampleCount: count($candidateWall),
             baselineMedianWall: $baselineWallStatistics->median(),
             candidateMedianWall: $candidateWallStatistics->median(),
             baselineP95Wall: $baselineWallStatistics->percentile(Statistics::P95),
             candidateP95Wall: $candidateWallStatistics->percentile(Statistics::P95),
+            wallShift: $shiftEstimator->estimate(self::samplePairs(blocks: $blocks, baseline: $baselineWall, candidate: $candidateWall)),
             divergent: $divergent,
-            blocks: self::compareBlocks(baseline: $baselineCell->blocks, candidate: $candidateCell->blocks),
+            blocks: $blocks,
+        );
+    }
+
+    /**
+     * The units the shift estimate resamples within: the paired blocks when
+     * both runs recorded them, otherwise (an interrupted run) the pooled
+     * samples as one pair.
+     *
+     * @param list<BlockComparison> $blocks
+     *
+     * @return list<SamplePair>
+     */
+    private static function samplePairs(array $blocks, SampleCollection $baseline, SampleCollection $candidate): array
+    {
+        if ($blocks === []) {
+            return [new SamplePair(baseline: $baseline, candidate: $candidate)];
+        }
+
+        return array_map(
+            fn (BlockComparison $block): SamplePair => new SamplePair(baseline: $block->baselineSamples, candidate: $block->candidateSamples),
+            $blocks,
         );
     }
 
@@ -107,8 +142,8 @@ final class RunComparator
                 blockIndex: $baselineBlock->blockIndex,
                 baselineExecutionOrder: $baselineBlock->executionOrder,
                 candidateExecutionOrder: $candidateBlock->executionOrder,
-                baselineMedianWall: Statistics::create($baselineBlock->wallSamples)->median(),
-                candidateMedianWall: Statistics::create($candidateBlock->wallSamples)->median(),
+                baselineSamples: $baselineBlock->wallSamples,
+                candidateSamples: $candidateBlock->wallSamples,
             );
         }
         usort($pairs, fn (BlockComparison $a, BlockComparison $b): int => $a->blockIndex <=> $b->blockIndex);

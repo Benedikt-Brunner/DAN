@@ -12,8 +12,10 @@ Protocol: 5 warmup + 30 measured iterations in 4 blocks, 2 warmup at the start o
 
 | Scenario | Statements | SQL | Median A | Median B | Delta | p95 A | p95 B |
 |---|---|---|---:|---:|---:|---:|---:|
-| product.deep-read | 4 -> 5 | :warning: changed (1, 3) | 12.50ms | 12.60ms | +0.8% | 14.10ms | 14.30ms |
-| synthetic.json-path | 4 -> 4 | unchanged :grey_question: divergent | 3.00ms | 3.10ms | +3.3% | 3.40ms | 3.50ms |
+| product.deep-read | 4 -> 5 | :warning: changed (1, 3) | 12.50ms | 12.60ms | +0.8% [-1.2%, +2.8%] | 14.10ms* | 14.30ms* |
+| synthetic.json-path | 4 -> 4 | unchanged :grey_question: divergent | 3.00ms | 3.10ms | +3.3% [+1.3%, +5.3%] | 3.40ms* | 3.50ms* |
+
+Delta: estimated median shift with its 95% bootstrap interval. \* p95 from fewer than 100 samples is close to the largest observed value and only indicative.
 
 ## Block diagnostics
 

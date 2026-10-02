@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Dan\Harness\Comparison;
+namespace Dan\Harness\Measurement\Result;
 
 use Dan\Lib\Time\Duration;
 

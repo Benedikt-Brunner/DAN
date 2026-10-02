@@ -10,6 +10,7 @@ use Dan\Harness\Comparison\RunComparison;
 use Dan\Harness\Gate\Violation;
 use Dan\Harness\Gate\ViolationKind;
 use Dan\Harness\RunStore\Artifact\RunManifest;
+use Dan\Lib\Time\Duration;
 
 /**
  * PR-comment-ready markdown diff report.
@@ -127,11 +128,30 @@ final class MarkdownReportRenderer
                 ])
                 ->line('|---|---|---|---:|---:|---:|---:|---:|');
 
+            $p95IndicativeOnly = false;
             foreach ($groupCells as $cell) {
                 $markdown->tableRow($this->formatCell($cell));
+                $p95IndicativeOnly = $p95IndicativeOnly || $cell->p95IsIndicativeOnly();
             }
             $markdown->blankLine();
+            if ($p95IndicativeOnly) {
+                $markdown
+                    ->line(sprintf('Delta: estimated median shift with its %d%% bootstrap interval. \* p95 from fewer than %d samples is close to the largest observed value and only indicative.', $this->confidencePct($groupCells), CellComparison::RELIABLE_P95_SAMPLES))
+                    ->blankLine();
+            } else {
+                $markdown
+                    ->line(sprintf('Delta: estimated median shift with its %d%% bootstrap interval.', $this->confidencePct($groupCells)))
+                    ->blankLine();
+            }
         }
+    }
+
+    /**
+     * @param list<CellComparison> $cells non-empty
+     */
+    private function confidencePct(array $cells): int
+    {
+        return (int) round($cells[0]->wallShift->confidence * 100);
     }
 
     /**
@@ -159,7 +179,7 @@ final class MarkdownReportRenderer
         if ($cell->divergent) {
             $sqlStatus .= ' :grey_question: divergent';
         }
-        $delta = sprintf('%+.1f%%', $cell->wallDeltaPct());
+        $delta = $this->formatShift($cell);
         if ($cell->blockEffectsDisagree()) {
             $delta .= ' :grey_question: blocks disagree';
         }
@@ -171,9 +191,25 @@ final class MarkdownReportRenderer
             sprintf('%.2fms', $cell->baselineMedianWall->toMsFloat()),
             sprintf('%.2fms', $cell->candidateMedianWall->toMsFloat()),
             $delta,
-            sprintf('%.2fms', $cell->baselineP95Wall->toMsFloat()),
-            sprintf('%.2fms', $cell->candidateP95Wall->toMsFloat()),
+            $this->formatP95(duration: $cell->baselineP95Wall, indicativeOnly: $cell->p95IsIndicativeOnly()),
+            $this->formatP95(duration: $cell->candidateP95Wall, indicativeOnly: $cell->p95IsIndicativeOnly()),
         ];
+    }
+
+    /**
+     * The estimate followed by its interval, so a reader sees at a glance
+     * whether a delta is a finding or noise around zero.
+     */
+    private function formatShift(CellComparison $cell): string
+    {
+        $shift = $cell->wallShift;
+
+        return sprintf('%+.1f%% [%+.1f%%, %+.1f%%]', $shift->estimatePct, $shift->lowerPct, $shift->upperPct);
+    }
+
+    private function formatP95(Duration $duration, bool $indicativeOnly): string
+    {
+        return sprintf('%.2fms%s', $duration->toMsFloat(), $indicativeOnly ? '*' : '');
     }
 
     /**
@@ -252,9 +288,12 @@ final class MarkdownReportRenderer
                 implode(', ', $cell->changedStatementIndices),
             ),
             ViolationKind::WallRegression => sprintf(
-                '%s: median wall time regressed %.1f%% (%.2fms -> %.2fms, limit %.1f%%)',
+                '%s: median wall time regressed %.1f%% (%d%% interval [%+.1f%%, %+.1f%%] excludes zero; %.2fms -> %.2fms, limit %.1f%%)',
                 $cellName,
                 $cell->wallDeltaPct(),
+                (int) round($cell->wallShift->confidence * 100),
+                $cell->wallShift->lowerPct,
+                $cell->wallShift->upperPct,
                 $cell->baselineMedianWall->toMsFloat(),
                 $cell->candidateMedianWall->toMsFloat(),
                 // Non-null by Violation's constructor invariant.
