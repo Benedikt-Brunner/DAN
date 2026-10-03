@@ -8,11 +8,11 @@ use Dan\Harness\Measurement\Result\MedianShiftEstimator;
 use Dan\Harness\Measurement\Result\SampleCollection;
 use Dan\Harness\Measurement\Result\SamplePair;
 use Dan\Harness\Measurement\Result\Statistics;
-use Dan\Harness\RunStore\Artifact\BlockResult;
 use Dan\Harness\RunStore\Artifact\BlockResultCollection;
 use Dan\Harness\RunStore\Artifact\CellResult;
 use Dan\Harness\RunStore\Artifact\StatementProfile;
 use Dan\Harness\RunStore\Filesystem\RunDirectory;
+use Dan\Lib\Order\Sort;
 
 final class RunComparator
 {
@@ -102,19 +102,17 @@ final class RunComparator
      * both runs recorded them, otherwise (an interrupted run) the pooled
      * samples as one pair.
      *
-     * @param list<BlockComparison> $blocks
-     *
      * @return list<SamplePair>
      */
-    private static function samplePairs(array $blocks, SampleCollection $baseline, SampleCollection $candidate): array
+    private static function samplePairs(BlockComparisonCollection $blocks, SampleCollection $baseline, SampleCollection $candidate): array
     {
-        if ($blocks === []) {
+        if ($blocks->empty()) {
             return [new SamplePair(baseline: $baseline, candidate: $candidate)];
         }
 
         return array_map(
             fn (BlockComparison $block): SamplePair => new SamplePair(baseline: $block->baselineSamples, candidate: $block->candidateSamples),
-            $blocks,
+            $blocks->getItems(),
         );
     }
 
@@ -122,20 +120,13 @@ final class RunComparator
      * Pairs the two runs' blocks by block index. A block index present on one
      * side only (an interrupted run) has no pair and is left out - the pooled
      * numbers still cover its samples.
-     *
-     * @return list<BlockComparison>
      */
-    private static function compareBlocks(BlockResultCollection $baseline, BlockResultCollection $candidate): array
+    private static function compareBlocks(BlockResultCollection $baseline, BlockResultCollection $candidate): BlockComparisonCollection
     {
-        $candidateByIndex = [];
-        foreach ($candidate as $block) {
-            $candidateByIndex[$block->blockIndex] = $block;
-        }
-
         $pairs = [];
         foreach ($baseline as $baselineBlock) {
-            $candidateBlock = $candidateByIndex[$baselineBlock->blockIndex] ?? null;
-            if (!$candidateBlock instanceof BlockResult || $baselineBlock->wallSamples->empty() || $candidateBlock->wallSamples->empty()) {
+            $candidateBlock = $candidate->findByBlockIndex($baselineBlock->blockIndex);
+            if ($candidateBlock === null || $baselineBlock->wallSamples->empty() || $candidateBlock->wallSamples->empty()) {
                 continue;
             }
             $pairs[] = new BlockComparison(
@@ -146,8 +137,7 @@ final class RunComparator
                 candidateSamples: $candidateBlock->wallSamples,
             );
         }
-        usort($pairs, fn (BlockComparison $a, BlockComparison $b): int => $a->blockIndex <=> $b->blockIndex);
 
-        return $pairs;
+        return BlockComparisonCollection::create(Sort::ascending($pairs));
     }
 }

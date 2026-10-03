@@ -71,7 +71,7 @@ final class RunComparatorPropertyTest extends PropertyTestCase
                         foreach ($cell->blocks as $block) {
                             self::assertSame(0.0, $block->wallDeltaPct());
                         }
-                        self::assertFalse($cell->blockEffectsDisagree());
+                        self::assertFalse($cell->blocks->effectsDisagree());
                     }
                     self::assertCount(count($written), $baseline->allCells());
                 });

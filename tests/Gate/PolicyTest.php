@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Dan\Harness\Tests\Gate;
 
+use Dan\Harness\Comparison\BlockComparisonCollection;
 use Dan\Harness\Comparison\CellComparison;
 use Dan\Harness\Gate\Policy;
 use Dan\Harness\Gate\ViolationKind;
@@ -95,7 +96,7 @@ final class PolicyTest extends TestCase
             candidateP95Wall: Duration::fromNs(12_000_000),
             wallShift: $shift,
             divergent: false,
-            blocks: [],
+            blocks: BlockComparisonCollection::create([]),
         );
     }
 }

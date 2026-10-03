@@ -162,7 +162,7 @@ final class RunComparatorTest extends TestCase
         self::assertSame(1, $cell->blocks[1]->blockIndex);
         self::assertFalse($cell->blocks[1]->baselineRanFirst());
         self::assertSame(-20.0, $cell->blocks[1]->wallDeltaPct());
-        self::assertTrue($cell->blockEffectsDisagree());
+        self::assertTrue($cell->blocks->effectsDisagree());
         self::assertSame(0.0, $cell->wallDeltaPct(), 'The pooled medians cancel out - exactly why the per-block view exists.');
     }
 

@@ -115,14 +115,14 @@ final class CellResult
         $measuredIterations = $payload['measuredIterations'] ?? null;
         $wallSamples = $payload['wallNsSamples'] ?? null;
         $statements = $payload['statements'] ?? null;
-        if (!is_int($schemaVersion) || !is_string($scenario) || !is_int($warmupIterations) || !is_int($measuredIterations) || !is_array($statements)) {
+        if (!is_int($schemaVersion) || !is_string($scenario) || !is_int($warmupIterations) || !is_int($measuredIterations) || !is_array($wallSamples) || !is_array($statements)) {
             throw new RuntimeException('Malformed scenario-result payload.');
         }
         $expected = ScenarioResultSchemaVersion::getCurrent();
         if ($schemaVersion !== $expected->value) {
             throw new RuntimeException(sprintf('Unsupported scenario result schema version %d (expected %d).', $schemaVersion, $expected->value));
         }
-        $wallSamples = SampleCollection::fromDecodedArray(payload: $wallSamples, context: 'scenario result wall samples');
+        $wallSamples = SampleCollection::fromDecodedArray($wallSamples);
 
         if ($measuredIterations !== $block->iterations) {
             throw new RuntimeException(sprintf('Scenario "%s": the probe measured %d iterations but block %d was scheduled with %d.', $scenario, $measuredIterations, $block->blockIndex, $block->iterations));

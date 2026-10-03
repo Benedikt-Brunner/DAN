@@ -14,7 +14,6 @@ final class CellComparison
 {
     /**
      * @param list<int> $changedStatementIndices
-     * @param list<BlockComparison> $blocks per mirrored block pair, in block order
      */
     public function __construct(
         public readonly ScenarioName $scenario,
@@ -32,7 +31,7 @@ final class CellComparison
         public readonly Duration $candidateP95Wall,
         public readonly MedianShift $wallShift,
         public readonly bool $divergent,
-        public readonly array $blocks,
+        public readonly BlockComparisonCollection $blocks,
     ) {}
 
     /**
@@ -54,23 +53,5 @@ final class CellComparison
     public function p95IsIndicativeOnly(): bool
     {
         return min($this->baselineSampleCount, $this->candidateSampleCount) < self::RELIABLE_P95_SAMPLES;
-    }
-
-    /**
-     * True when the per-block effects do not even agree on a direction: some
-     * blocks saw the candidate faster, others slower. Such a cell's pooled
-     * delta describes noise or an order effect, not the implementation.
-     */
-    public function blockEffectsDisagree(): bool
-    {
-        $sawFaster = false;
-        $sawSlower = false;
-        foreach ($this->blocks as $block) {
-            $delta = $block->wallDeltaPct();
-            $sawFaster = $sawFaster || $delta < 0.0;
-            $sawSlower = $sawSlower || $delta > 0.0;
-        }
-
-        return $sawFaster && $sawSlower;
     }
 }

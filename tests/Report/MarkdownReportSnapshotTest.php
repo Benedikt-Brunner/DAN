@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Dan\Harness\Tests\Report;
 
 use Dan\Harness\Comparison\BlockComparison;
+use Dan\Harness\Comparison\BlockComparisonCollection;
 use Dan\Harness\Comparison\CellComparison;
 use Dan\Harness\Comparison\RunComparison;
 use Dan\Harness\Gate\Policy;
@@ -283,7 +284,7 @@ final class MarkdownReportSnapshotTest extends TestCase
             // that the injected regression stays significant.
             wallShift: new MedianShift(estimatePct: $estimatePct, lowerPct: $estimatePct - 2.0, upperPct: $estimatePct + 2.0, confidence: 0.95, resamples: 1000),
             divergent: $divergent,
-            blocks: $blocks,
+            blocks: BlockComparisonCollection::create($blocks),
         );
     }
 }
