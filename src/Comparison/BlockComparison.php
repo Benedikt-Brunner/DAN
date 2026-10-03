@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Dan\Harness\Comparison;
 
+use Dan\Harness\Measurement\Result\LatencyDelta;
+use Dan\Harness\Measurement\Result\SampleCollection;
+use Dan\Harness\Measurement\Result\Statistics;
 use Dan\Lib\Order\Ordered;
 use Dan\Lib\Order\Ordering;
 use Dan\Lib\Order\TotallyOrdered;
@@ -18,13 +21,19 @@ use LogicException;
  */
 final class BlockComparison implements TotallyOrdered
 {
+    public readonly Duration $baselineMedianWall;
+    public readonly Duration $candidateMedianWall;
+
     public function __construct(
         public readonly int $blockIndex,
         public readonly int $baselineExecutionOrder,
         public readonly int $candidateExecutionOrder,
-        public readonly Duration $baselineMedianWall,
-        public readonly Duration $candidateMedianWall,
-    ) {}
+        public readonly SampleCollection $baselineSamples,
+        public readonly SampleCollection $candidateSamples,
+    ) {
+        $this->baselineMedianWall = Statistics::create($baselineSamples)->median();
+        $this->candidateMedianWall = Statistics::create($candidateSamples)->median();
+    }
 
     /**
      * Block pairs are ordered by block index.

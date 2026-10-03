@@ -7,9 +7,12 @@ namespace Dan\Harness\Report;
 use Dan\Harness\Comparison\BlockComparison;
 use Dan\Harness\Comparison\CellComparison;
 use Dan\Harness\Comparison\RunComparison;
+use Dan\Harness\Gate\Policy;
 use Dan\Harness\Gate\Violation;
 use Dan\Harness\Gate\ViolationKind;
+use Dan\Harness\Measurement\Result\MedianShiftEstimator;
 use Dan\Harness\RunStore\Artifact\RunManifest;
+use Dan\Lib\Time\Duration;
 
 /**
  * PR-comment-ready markdown diff report.
@@ -20,7 +23,7 @@ final class MarkdownReportRenderer
     /**
      * @param list<Violation> $violations
      */
-    public function render(RunComparison $comparison, array $violations = []): string
+    public function render(RunComparison $comparison, Policy $policy, array $violations = []): string
     {
         $markdown = new MarkdownBuilder();
 
@@ -30,6 +33,7 @@ final class MarkdownReportRenderer
             candidate: $comparison->candidateManifest,
         );
         $this->appendProtocol(markdown: $markdown, comparison: $comparison);
+        $this->appendGate(markdown: $markdown, policy: $policy);
         $this->appendViolations(markdown: $markdown, violations: $violations);
         $this->appendCellTables(markdown: $markdown, cells: $comparison->cells);
         $this->appendBlockDiagnostics(markdown: $markdown, cells: $comparison->cells);
@@ -91,6 +95,26 @@ final class MarkdownReportRenderer
     }
 
     /**
+     * The decision rule the cells were judged by, so a passing cell's shift
+     * and interval can be read against the limit that let it pass.
+     */
+    private function appendGate(MarkdownBuilder $markdown, Policy $policy): void
+    {
+        $latency = $policy->maxWallRegressionPct === null
+            ? 'latency not gated'
+            : sprintf(
+                'a cell fails when its estimated median shift exceeds %+.1f%% and its %d%% interval excludes zero',
+                $policy->maxWallRegressionPct,
+                (int) round(MedianShiftEstimator::CONFIDENCE * 100),
+            );
+        $sql = $policy->failOnSqlChange ? 'SQL changes fail' : 'SQL changes are reported only';
+
+        $markdown
+            ->line(sprintf('Gate: %s; %s.', $latency, $sql))
+            ->blankLine();
+    }
+
+    /**
      * @param list<Violation> $violations
      */
     private function appendViolations(MarkdownBuilder $markdown, array $violations): void
@@ -127,10 +151,25 @@ final class MarkdownReportRenderer
                 ])
                 ->line('|---|---|---|---:|---:|---:|---:|---:|');
 
+            $p95IndicativeOnly = false;
+            $shiftWithoutInterval = false;
             foreach ($groupCells as $cell) {
                 $markdown->tableRow($this->formatCell($cell));
+                $p95IndicativeOnly = $p95IndicativeOnly || $cell->p95IsIndicativeOnly();
+                $shiftWithoutInterval = $shiftWithoutInterval || !$cell->wallShift->hasInterval();
             }
             $markdown->blankLine();
+
+            $notes = [sprintf('Delta: estimated median shift with its %d%% bootstrap interval.', (int) round(MedianShiftEstimator::CONFIDENCE * 100))];
+            if ($shiftWithoutInterval) {
+                $notes[] = sprintf('"no interval": a block pair has fewer than %d samples on a side, so the shift cannot be resampled and does not gate.', MedianShiftEstimator::MIN_SAMPLES_PER_SIDE);
+            }
+            if ($p95IndicativeOnly) {
+                $notes[] = sprintf('\* p95 from fewer than %d samples is close to the largest observed value and only indicative.', CellComparison::RELIABLE_P95_SAMPLES);
+            }
+            $markdown
+                ->line(implode(' ', $notes))
+                ->blankLine();
         }
     }
 
@@ -159,7 +198,7 @@ final class MarkdownReportRenderer
         if ($cell->divergent) {
             $sqlStatus .= ' :grey_question: divergent';
         }
-        $delta = sprintf('%+.1f%%', $cell->wallDeltaPct());
+        $delta = $this->formatShift($cell);
         if ($cell->blocks->effectsDisagree()) {
             $delta .= ' :grey_question: blocks disagree';
         }
@@ -171,9 +210,28 @@ final class MarkdownReportRenderer
             sprintf('%.2fms', $cell->baselineMedianWall->toMsFloat()),
             sprintf('%.2fms', $cell->candidateMedianWall->toMsFloat()),
             $delta,
-            sprintf('%.2fms', $cell->baselineP95Wall->toMsFloat()),
-            sprintf('%.2fms', $cell->candidateP95Wall->toMsFloat()),
+            $this->formatP95(duration: $cell->baselineP95Wall, indicativeOnly: $cell->p95IsIndicativeOnly()),
+            $this->formatP95(duration: $cell->candidateP95Wall, indicativeOnly: $cell->p95IsIndicativeOnly()),
         ];
+    }
+
+    /**
+     * The estimate followed by its interval, so a reader sees at a glance
+     * whether a delta is a finding or noise around zero.
+     */
+    private function formatShift(CellComparison $cell): string
+    {
+        $shift = $cell->wallShift;
+        if (!$shift->hasInterval()) {
+            return sprintf('%+.1f%% [no interval]', $shift->estimatePct);
+        }
+
+        return sprintf('%+.1f%% [%+.1f%%, %+.1f%%]', $shift->estimatePct, $shift->lowerPct, $shift->upperPct);
+    }
+
+    private function formatP95(Duration $duration, bool $indicativeOnly): string
+    {
+        return sprintf('%.2fms%s', $duration->toMsFloat(), $indicativeOnly ? '*' : '');
     }
 
     /**
@@ -252,9 +310,12 @@ final class MarkdownReportRenderer
                 implode(', ', $cell->changedStatementIndices),
             ),
             ViolationKind::WallRegression => sprintf(
-                '%s: median wall time regressed %.1f%% (%.2fms -> %.2fms, limit %.1f%%)',
+                '%s: median wall time regressed %.1f%% (%d%% interval [%+.1f%%, %+.1f%%] excludes zero; %.2fms -> %.2fms, limit %.1f%%)',
                 $cellName,
                 $cell->wallDeltaPct(),
+                (int) round($cell->wallShift->confidence * 100),
+                $cell->wallShift->lowerPct,
+                $cell->wallShift->upperPct,
                 $cell->baselineMedianWall->toMsFloat(),
                 $cell->candidateMedianWall->toMsFloat(),
                 // Non-null by Violation's constructor invariant.

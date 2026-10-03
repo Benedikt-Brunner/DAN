@@ -162,7 +162,7 @@ final class RunCommand extends Command
 
         $violations = $policy->evaluate($comparison->cells);
 
-        $report = (new MarkdownReportRenderer())->render(comparison: $comparison, violations: $violations);
+        $report = (new MarkdownReportRenderer())->render(comparison: $comparison, policy: $policy, violations: $violations);
         $reportPath = $sessionDir->join('report.md');
         file_put_contents($reportPath->toString(), $report . "\n");
 

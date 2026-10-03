@@ -6,7 +6,7 @@ namespace Dan\Harness\Tests\Comparison;
 
 use Dan\Harness\Comparison\BlockComparison;
 use Dan\Harness\Comparison\BlockComparisonCollection;
-use Dan\Lib\Time\Duration;
+use Dan\Harness\Measurement\Result\SampleCollection;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -29,8 +29,8 @@ final class BlockComparisonCollectionTest extends TestCase
                 blockIndex: $blockIndex,
                 baselineExecutionOrder: 2 * $blockIndex,
                 candidateExecutionOrder: 2 * $blockIndex + 1,
-                baselineMedianWall: Duration::fromNs($baselineMs * 1_000_000),
-                candidateMedianWall: Duration::fromNs($candidateMs * 1_000_000),
+                baselineSamples: SampleCollection::fromArray([$baselineMs * 1_000_000]),
+                candidateSamples: SampleCollection::fromArray([$candidateMs * 1_000_000]),
             );
         }
 

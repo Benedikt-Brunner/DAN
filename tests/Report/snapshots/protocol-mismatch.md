@@ -11,6 +11,8 @@
 
 Protocol: 5 warmup + 30 measured iterations in 4 blocks, 2 warmup at the start of every block.
 
+Gate: a cell fails when its estimated median shift exceeds +10.0% and its 95% interval excludes zero; SQL changes fail.
+
 Cells only present in run A: `product.deep-read--S--mysql-8.0.json`
 
 Cells only present in run B: `order.aggregation--S--mysql-8.0.json`
