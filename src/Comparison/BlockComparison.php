@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace Dan\Harness\Comparison;
 
+use Dan\Lib\Order\Ordered;
+use Dan\Lib\Order\Ordering;
+use Dan\Lib\Order\TotallyOrdered;
 use Dan\Lib\Time\Duration;
+use LogicException;
 
 /**
  * Baseline against candidate within one mirrored block pair. The two halves
@@ -12,7 +16,7 @@ use Dan\Lib\Time\Duration;
  * estimate a session offers; comparing the pairs with each other exposes
  * order effects (whichever slot ran first) and host drift over the session.
  */
-final class BlockComparison
+final class BlockComparison implements TotallyOrdered
 {
     public function __construct(
         public readonly int $blockIndex,
@@ -21,6 +25,18 @@ final class BlockComparison
         public readonly Duration $baselineMedianWall,
         public readonly Duration $candidateMedianWall,
     ) {}
+
+    /**
+     * Block pairs are ordered by block index.
+     */
+    public function compareTo(Ordered $other): Ordering
+    {
+        if (!$other instanceof self) {
+            throw new LogicException(sprintf('%s is only ordered against its own kind, not %s.', self::class, $other::class));
+        }
+
+        return Ordering::between(left: $this->blockIndex, right: $other->blockIndex);
+    }
 
     public function baselineRanFirst(): bool
     {

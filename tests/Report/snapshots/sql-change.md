@@ -17,11 +17,11 @@ Protocol: 5 warmup + 30 measured iterations in 4 blocks, 2 warmup at the start o
 
 ## Block diagnostics
 
-Median wall time per mirrored block pair. "Order" is which implementation ran first within the pair; a delta that flips sign between pairs points at an order effect or host drift rather than at the implementation.
+Median wall time per mirrored block pair. "Order" is which slot ran first within the pair; a delta that flips sign between pairs points at an order effect or host drift rather than at the implementation.
 
-| Cell | Block | Order | Median A | Median B | Delta |
+| Cell | Block | Order | Median baseline | Median candidate | Delta |
 |---|---:|---|---:|---:|---:|
-| product.deep-read / S / mysql-8.0 | 0 | A, B | 12.50ms | 12.60ms | +0.8% |
-| product.deep-read / S / mysql-8.0 | 1 | B, A | 12.50ms | 12.60ms | +0.8% |
-| synthetic.json-path / S / mysql-8.0 | 0 | A, B | 3.00ms | 3.10ms | +3.3% |
-| synthetic.json-path / S / mysql-8.0 | 1 | B, A | 3.00ms | 3.10ms | +3.3% |
+| product.deep-read / S / mysql-8.0 | 0 | baseline first | 12.50ms | 12.60ms | +0.8% |
+| product.deep-read / S / mysql-8.0 | 1 | candidate first | 12.50ms | 12.60ms | +0.8% |
+| synthetic.json-path / S / mysql-8.0 | 0 | baseline first | 3.00ms | 3.10ms | +3.3% |
+| synthetic.json-path / S / mysql-8.0 | 1 | candidate first | 3.00ms | 3.10ms | +3.3% |

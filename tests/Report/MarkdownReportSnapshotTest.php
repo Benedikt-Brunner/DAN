@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Dan\Harness\Tests\Report;
 
 use Dan\Harness\Comparison\BlockComparison;
+use Dan\Harness\Comparison\BlockComparisonCollection;
 use Dan\Harness\Comparison\CellComparison;
 use Dan\Harness\Comparison\RunComparison;
 use Dan\Harness\Gate\Policy;
@@ -271,7 +272,7 @@ final class MarkdownReportSnapshotTest extends TestCase
             baselineP95Wall: Duration::fromNs($p95Ms[0] * 1_000_000),
             candidateP95Wall: Duration::fromNs($p95Ms[1] * 1_000_000),
             divergent: $divergent,
-            blocks: $blocks,
+            blocks: BlockComparisonCollection::create($blocks),
         );
     }
 }

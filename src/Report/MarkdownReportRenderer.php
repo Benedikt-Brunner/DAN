@@ -160,7 +160,7 @@ final class MarkdownReportRenderer
             $sqlStatus .= ' :grey_question: divergent';
         }
         $delta = sprintf('%+.1f%%', $cell->wallDeltaPct());
-        if ($cell->blockEffectsDisagree()) {
+        if ($cell->blocks->effectsDisagree()) {
             $delta .= ' :grey_question: blocks disagree';
         }
 
@@ -184,7 +184,7 @@ final class MarkdownReportRenderer
      */
     private function appendBlockDiagnostics(MarkdownBuilder $markdown, array $cells): void
     {
-        $cellsWithBlocks = array_values(array_filter($cells, fn (CellComparison $cell): bool => $cell->blocks !== []));
+        $cellsWithBlocks = array_values(array_filter($cells, fn (CellComparison $cell): bool => !$cell->blocks->empty()));
         if ($cellsWithBlocks === []) {
             return;
         }
@@ -192,14 +192,14 @@ final class MarkdownReportRenderer
         $markdown
             ->heading('Block diagnostics')
             ->blankLine()
-            ->line('Median wall time per mirrored block pair. "Order" is which implementation ran first within the pair; a delta that flips sign between pairs points at an order effect or host drift rather than at the implementation.')
+            ->line('Median wall time per mirrored block pair. "Order" is which slot ran first within the pair; a delta that flips sign between pairs points at an order effect or host drift rather than at the implementation.')
             ->blankLine()
             ->tableRow([
                 'Cell',
                 'Block',
                 'Order',
-                'Median A',
-                'Median B',
+                'Median baseline',
+                'Median candidate',
                 'Delta',
             ])
             ->line('|---|---:|---|---:|---:|---:|');
@@ -218,7 +218,7 @@ final class MarkdownReportRenderer
         return [
             $cellName,
             (string) $block->blockIndex,
-            $block->baselineRanFirst() ? 'A, B' : 'B, A',
+            $block->baselineRanFirst() ? 'baseline first' : 'candidate first',
             sprintf('%.2fms', $block->baselineMedianWall->toMsFloat()),
             sprintf('%.2fms', $block->candidateMedianWall->toMsFloat()),
             sprintf('%+.1f%%', $block->wallDeltaPct()),
