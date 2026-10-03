@@ -176,7 +176,7 @@ final class MarkdownReportSnapshotTest extends TestCase
                     cellsOnlyInCandidate: [],
                 ),
                 'policy' => $policy,
-                'violations' => [],
+                'violations' => $policy->evaluate($sqlChangeCells),
             ],
             'regression-with-violations' => [
                 'comparison' => new RunComparison(

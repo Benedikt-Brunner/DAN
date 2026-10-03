@@ -162,6 +162,21 @@ final class MedianShiftEstimatorTest extends TestCase
         ]));
     }
 
+    public function testAZeroCandidateIsAFullImprovementNotARefusal(): void
+    {
+        $shift = (new MedianShiftEstimator(resamples: 20))->estimate([
+            self::pair(baseline: [
+                10,
+                10,
+            ], candidate: [
+                0,
+                0,
+            ]),
+        ]);
+
+        self::assertSame(-100.0, $shift->estimatePct);
+    }
+
     public function testAShiftRefusesAnInvertedInterval(): void
     {
         $this->expectException(InvalidArgumentException::class);

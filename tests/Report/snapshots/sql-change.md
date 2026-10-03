@@ -10,6 +10,10 @@ Protocol: 5 warmup + 30 measured iterations in 4 blocks, 2 warmup at the start o
 
 Gate: a cell fails when its estimated median shift exceeds +10.0% and its 95% interval excludes zero; SQL changes fail.
 
+## Gate violations
+
+- :x: product.deep-read / S / mysql-8.0: generated SQL changed (statements 1, 3)
+
 ## S / mysql-8.0
 
 | Scenario | Statements | SQL | Median baseline | Median candidate | Delta | p95 baseline | p95 candidate |

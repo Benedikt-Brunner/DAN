@@ -90,7 +90,7 @@ final class DomainGenerators
      */
     public static function samples(): Generator
     {
-        // A timed iteration never takes zero nanoseconds; SamplePair refuses one.
+        // A timed iteration never takes zero nanoseconds; SamplePair refuses a zero baseline.
         return self::boundedList(elements: Generator\choose(1, 5_000_000_000), maxLength: 20);
     }
 

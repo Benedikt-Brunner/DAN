@@ -11,9 +11,9 @@ use InvalidArgumentException;
  * pair, or the pooled samples of a cell. The unit a shift estimate resamples
  * within, so block structure survives the resampling.
  *
- * Every sample must be a positive duration: a relative shift against a zero
- * baseline is undefined, and a timed iteration never takes zero nanoseconds,
- * so a zero sample is a corrupt measurement to refuse - not a delta of 0%.
+ * Every baseline sample must be a positive duration: a relative shift
+ * against a zero baseline is undefined, so such a sample is refused rather
+ * than read as a delta of 0%. The candidate side has no such constraint.
  */
 final class SamplePair
 {
@@ -24,14 +24,9 @@ final class SamplePair
         if ($baseline->empty() || $candidate->empty()) {
             throw new InvalidArgumentException('A sample pair needs at least one sample on each side.');
         }
-        foreach (
-            [
-                ...$baseline->toNsArray(),
-                ...$candidate->toNsArray(),
-            ] as $ns
-        ) {
+        foreach ($baseline->toNsArray() as $ns) {
             if ($ns <= 0) {
-                throw new InvalidArgumentException('A sample pair needs positive wall times; a zero duration has no relative shift.');
+                throw new InvalidArgumentException('A sample pair needs positive baseline wall times; a shift relative to zero is undefined.');
             }
         }
     }
