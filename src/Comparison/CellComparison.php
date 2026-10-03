@@ -27,15 +27,11 @@ final class CellComparison
         public readonly Duration $baselineP95Wall,
         public readonly Duration $candidateP95Wall,
         public readonly bool $divergent,
+        public readonly BlockComparisonCollection $blocks,
     ) {}
 
     public function wallDeltaPct(): float
     {
-        $baselineNs = $this->baselineMedianWall->toNsFloat();
-        if ($baselineNs <= 0.0) {
-            return 0.0;
-        }
-
-        return (($this->candidateMedianWall->toNsFloat() - $baselineNs) / $baselineNs) * 100;
+        return LatencyDelta::percent(baseline: $this->baselineMedianWall, candidate: $this->candidateMedianWall);
     }
 }

@@ -15,7 +15,18 @@ Protocol: 5 warmup + 30 measured iterations in 4 blocks, 2 warmup at the start o
 
 ## S / mysql-8.0
 
-| Scenario | Statements | SQL | Median A | Median B | Delta | p95 A | p95 B |
+| Scenario | Statements | SQL | Median baseline | Median candidate | Delta | p95 baseline | p95 candidate |
 |---|---|---|---:|---:|---:|---:|---:|
 | product.deep-read | 4 -> 4 | unchanged | 12.50ms | 19.40ms | +55.2% | 14.10ms | 26.00ms |
-| product.keyword-listing | 4 -> 4 | :warning: changed (0) | 8.20ms | 8.30ms | +1.2% | 9.90ms | 10.00ms |
+| product.keyword-listing | 4 -> 4 | :warning: changed (0) | 8.20ms | 8.30ms | +1.2% :grey_question: blocks disagree | 9.90ms | 10.00ms |
+
+## Block diagnostics
+
+Median wall time per mirrored block pair. "Order" is which slot ran first within the pair; a delta that flips sign between pairs points at an order effect or host drift rather than at the implementation.
+
+| Cell | Block | Order | Median baseline | Median candidate | Delta |
+|---|---:|---|---:|---:|---:|
+| product.deep-read / S / mysql-8.0 | 0 | baseline first | 12.50ms | 19.40ms | +55.2% |
+| product.deep-read / S / mysql-8.0 | 1 | candidate first | 12.50ms | 19.40ms | +55.2% |
+| product.keyword-listing / S / mysql-8.0 | 0 | baseline first | 8.10ms | 8.60ms | +6.2% |
+| product.keyword-listing / S / mysql-8.0 | 1 | candidate first | 8.30ms | 8.00ms | -3.6% |
