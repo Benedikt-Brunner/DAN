@@ -28,6 +28,12 @@ final class MedianShiftEstimator
     public const float CONFIDENCE = 0.95;
 
     /**
+     * Below this many samples on either side of a pair, resampling that pair
+     * cannot vary and the interval would be degenerate.
+     */
+    public const int MIN_SAMPLES_PER_SIDE = 2;
+
+    /**
      * Fixed on purpose: a report is a function of the artifacts, not of the
      * moment it was rendered.
      */
@@ -54,6 +60,12 @@ final class MedianShiftEstimator
             baseline: self::pool(array_map(fn (SamplePair $pair): SampleCollection => $pair->baseline, $pairs)),
             candidate: self::pool(array_map(fn (SamplePair $pair): SampleCollection => $pair->candidate, $pairs)),
         );
+
+        foreach ($pairs as $pair) {
+            if (min(count($pair->baseline), count($pair->candidate)) < self::MIN_SAMPLES_PER_SIDE) {
+                return MedianShift::withoutInterval(estimatePct: $estimate, confidence: self::CONFIDENCE);
+            }
+        }
 
         $randomizer = new Randomizer(new Mt19937(self::SEED));
         $shifts = [];

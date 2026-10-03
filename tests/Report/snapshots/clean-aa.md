@@ -8,6 +8,8 @@
 
 Protocol: 5 warmup + 30 measured iterations in 4 blocks, 2 warmup at the start of every block.
 
+Gate: a cell fails when its estimated median shift exceeds +10.0% and its 95% interval excludes zero; SQL changes fail.
+
 ## M / mariadb-11.4
 
 | Scenario | Statements | SQL | Median baseline | Median candidate | Delta | p95 baseline | p95 candidate |

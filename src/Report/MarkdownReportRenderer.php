@@ -7,8 +7,10 @@ namespace Dan\Harness\Report;
 use Dan\Harness\Comparison\BlockComparison;
 use Dan\Harness\Comparison\CellComparison;
 use Dan\Harness\Comparison\RunComparison;
+use Dan\Harness\Gate\Policy;
 use Dan\Harness\Gate\Violation;
 use Dan\Harness\Gate\ViolationKind;
+use Dan\Harness\Measurement\Result\MedianShiftEstimator;
 use Dan\Harness\RunStore\Artifact\RunManifest;
 use Dan\Lib\Time\Duration;
 
@@ -21,7 +23,7 @@ final class MarkdownReportRenderer
     /**
      * @param list<Violation> $violations
      */
-    public function render(RunComparison $comparison, array $violations = []): string
+    public function render(RunComparison $comparison, Policy $policy, array $violations = []): string
     {
         $markdown = new MarkdownBuilder();
 
@@ -31,6 +33,7 @@ final class MarkdownReportRenderer
             candidate: $comparison->candidateManifest,
         );
         $this->appendProtocol(markdown: $markdown, comparison: $comparison);
+        $this->appendGate(markdown: $markdown, policy: $policy);
         $this->appendViolations(markdown: $markdown, violations: $violations);
         $this->appendCellTables(markdown: $markdown, cells: $comparison->cells);
         $this->appendBlockDiagnostics(markdown: $markdown, cells: $comparison->cells);
@@ -92,6 +95,26 @@ final class MarkdownReportRenderer
     }
 
     /**
+     * The decision rule the cells were judged by, so a passing cell's shift
+     * and interval can be read against the limit that let it pass.
+     */
+    private function appendGate(MarkdownBuilder $markdown, Policy $policy): void
+    {
+        $latency = $policy->maxWallRegressionPct === null
+            ? 'latency not gated'
+            : sprintf(
+                'a cell fails when its estimated median shift exceeds %+.1f%% and its %d%% interval excludes zero',
+                $policy->maxWallRegressionPct,
+                (int) round(MedianShiftEstimator::CONFIDENCE * 100),
+            );
+        $sql = $policy->failOnSqlChange ? 'SQL changes fail' : 'SQL changes are reported only';
+
+        $markdown
+            ->line(sprintf('Gate: %s; %s.', $latency, $sql))
+            ->blankLine();
+    }
+
+    /**
      * @param list<Violation> $violations
      */
     private function appendViolations(MarkdownBuilder $markdown, array $violations): void
@@ -129,29 +152,25 @@ final class MarkdownReportRenderer
                 ->line('|---|---|---|---:|---:|---:|---:|---:|');
 
             $p95IndicativeOnly = false;
+            $shiftWithoutInterval = false;
             foreach ($groupCells as $cell) {
                 $markdown->tableRow($this->formatCell($cell));
                 $p95IndicativeOnly = $p95IndicativeOnly || $cell->p95IsIndicativeOnly();
+                $shiftWithoutInterval = $shiftWithoutInterval || !$cell->wallShift->hasInterval();
             }
             $markdown->blankLine();
-            if ($p95IndicativeOnly) {
-                $markdown
-                    ->line(sprintf('Delta: estimated median shift with its %d%% bootstrap interval. \* p95 from fewer than %d samples is close to the largest observed value and only indicative.', $this->confidencePct($groupCells), CellComparison::RELIABLE_P95_SAMPLES))
-                    ->blankLine();
-            } else {
-                $markdown
-                    ->line(sprintf('Delta: estimated median shift with its %d%% bootstrap interval.', $this->confidencePct($groupCells)))
-                    ->blankLine();
-            }
-        }
-    }
 
-    /**
-     * @param list<CellComparison> $cells non-empty
-     */
-    private function confidencePct(array $cells): int
-    {
-        return (int) round($cells[0]->wallShift->confidence * 100);
+            $notes = [sprintf('Delta: estimated median shift with its %d%% bootstrap interval.', (int) round(MedianShiftEstimator::CONFIDENCE * 100))];
+            if ($shiftWithoutInterval) {
+                $notes[] = sprintf('"no interval": a block pair has fewer than %d samples on a side, so the shift cannot be resampled and does not gate.', MedianShiftEstimator::MIN_SAMPLES_PER_SIDE);
+            }
+            if ($p95IndicativeOnly) {
+                $notes[] = sprintf('\* p95 from fewer than %d samples is close to the largest observed value and only indicative.', CellComparison::RELIABLE_P95_SAMPLES);
+            }
+            $markdown
+                ->line(implode(' ', $notes))
+                ->blankLine();
+        }
     }
 
     /**
@@ -203,6 +222,9 @@ final class MarkdownReportRenderer
     private function formatShift(CellComparison $cell): string
     {
         $shift = $cell->wallShift;
+        if (!$shift->hasInterval()) {
+            return sprintf('%+.1f%% [no interval]', $shift->estimatePct);
+        }
 
         return sprintf('%+.1f%% [%+.1f%%, %+.1f%%]', $shift->estimatePct, $shift->lowerPct, $shift->upperPct);
     }

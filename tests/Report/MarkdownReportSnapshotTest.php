@@ -43,7 +43,7 @@ final class MarkdownReportSnapshotTest extends TestCase
     public function testRenderedReportMatchesSnapshot(string $snapshot): void
     {
         $case = self::comparisonCases()[$snapshot];
-        $rendered = (new MarkdownReportRenderer())->render(comparison: $case['comparison'], violations: $case['violations']);
+        $rendered = (new MarkdownReportRenderer())->render(comparison: $case['comparison'], policy: $case['policy'], violations: $case['violations']);
 
         $path = __DIR__ . '/snapshots/' . $snapshot . '.md';
         if (getenv('DAN_UPDATE_SNAPSHOTS') === '1') {
@@ -68,7 +68,7 @@ final class MarkdownReportSnapshotTest extends TestCase
     }
 
     /**
-     * @return array<string, array{comparison: RunComparison, violations: list<Violation>}>
+     * @return array<string, array{comparison: RunComparison, policy: Policy, violations: list<Violation>}>
      */
     private static function comparisonCases(): array
     {
@@ -120,7 +120,7 @@ final class MarkdownReportSnapshotTest extends TestCase
             ], p95Ms: [
                 3.4,
                 3.5,
-            ], divergent: true),
+            ], divergent: true, withoutInterval: true),
         ];
 
         $regressionCells = [
@@ -150,7 +150,8 @@ final class MarkdownReportSnapshotTest extends TestCase
         ];
         // The violations come from the real gate, so the report renders what
         // CI would actually enforce.
-        $violations = (new Policy(maxWallRegressionPct: 10.0, failOnSqlChange: true))->evaluate($regressionCells);
+        $policy = new Policy(maxWallRegressionPct: 10.0, failOnSqlChange: true);
+        $violations = $policy->evaluate($regressionCells);
 
         return [
             'clean-aa' => [
@@ -162,6 +163,7 @@ final class MarkdownReportSnapshotTest extends TestCase
                     cellsOnlyInBaseline: [],
                     cellsOnlyInCandidate: [],
                 ),
+                'policy' => $policy,
                 'violations' => [],
             ],
             'sql-change' => [
@@ -173,6 +175,7 @@ final class MarkdownReportSnapshotTest extends TestCase
                     cellsOnlyInBaseline: [],
                     cellsOnlyInCandidate: [],
                 ),
+                'policy' => $policy,
                 'violations' => [],
             ],
             'regression-with-violations' => [
@@ -184,6 +187,7 @@ final class MarkdownReportSnapshotTest extends TestCase
                     cellsOnlyInBaseline: [],
                     cellsOnlyInCandidate: [],
                 ),
+                'policy' => $policy,
                 'violations' => $violations,
             ],
             'protocol-mismatch' => [
@@ -195,6 +199,7 @@ final class MarkdownReportSnapshotTest extends TestCase
                     cellsOnlyInBaseline: ['product.deep-read--S--mysql-8.0.json'],
                     cellsOnlyInCandidate: ['order.aggregation--S--mysql-8.0.json'],
                 ),
+                'policy' => $policy,
                 'violations' => [],
             ],
         ];
@@ -245,6 +250,7 @@ final class MarkdownReportSnapshotTest extends TestCase
         ],
         bool $divergent = false,
         ?array $blockMedianMs = null,
+        bool $withoutInterval = false,
     ): CellComparison {
         $blocks = [];
         foreach (
@@ -282,7 +288,9 @@ final class MarkdownReportSnapshotTest extends TestCase
             // A +-2 point interval around the estimate: wide enough that the
             // small deltas in these fixtures straddle zero, narrow enough
             // that the injected regression stays significant.
-            wallShift: new MedianShift(estimatePct: $estimatePct, lowerPct: $estimatePct - 2.0, upperPct: $estimatePct + 2.0, confidence: 0.95, resamples: 1000),
+            wallShift: $withoutInterval
+                ? MedianShift::withoutInterval(estimatePct: $estimatePct, confidence: 0.95)
+                : new MedianShift(estimatePct: $estimatePct, lowerPct: $estimatePct - 2.0, upperPct: $estimatePct + 2.0, confidence: 0.95, resamples: 1000),
             divergent: $divergent,
             blocks: BlockComparisonCollection::create($blocks),
         );

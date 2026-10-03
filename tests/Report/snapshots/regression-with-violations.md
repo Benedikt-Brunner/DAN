@@ -8,6 +8,8 @@
 
 Protocol: 5 warmup + 30 measured iterations in 4 blocks, 2 warmup at the start of every block.
 
+Gate: a cell fails when its estimated median shift exceeds +10.0% and its 95% interval excludes zero; SQL changes fail.
+
 ## Gate violations
 
 - :x: product.deep-read / S / mysql-8.0: median wall time regressed 55.2% (95% interval [+53.2%, +57.2%] excludes zero; 12.50ms -> 19.40ms, limit 10.0%)

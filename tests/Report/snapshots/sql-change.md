@@ -8,14 +8,16 @@
 
 Protocol: 5 warmup + 30 measured iterations in 4 blocks, 2 warmup at the start of every block.
 
+Gate: a cell fails when its estimated median shift exceeds +10.0% and its 95% interval excludes zero; SQL changes fail.
+
 ## S / mysql-8.0
 
 | Scenario | Statements | SQL | Median baseline | Median candidate | Delta | p95 baseline | p95 candidate |
 |---|---|---|---:|---:|---:|---:|---:|
 | product.deep-read | 4 -> 5 | :warning: changed (1, 3) | 12.50ms | 12.60ms | +0.8% [-1.2%, +2.8%] | 14.10ms* | 14.30ms* |
-| synthetic.json-path | 4 -> 4 | unchanged :grey_question: divergent | 3.00ms | 3.10ms | +3.3% [+1.3%, +5.3%] | 3.40ms* | 3.50ms* |
+| synthetic.json-path | 4 -> 4 | unchanged :grey_question: divergent | 3.00ms | 3.10ms | +3.3% [no interval] | 3.40ms* | 3.50ms* |
 
-Delta: estimated median shift with its 95% bootstrap interval. \* p95 from fewer than 100 samples is close to the largest observed value and only indicative.
+Delta: estimated median shift with its 95% bootstrap interval. "no interval": a block pair has fewer than 2 samples on a side, so the shift cannot be resampled and does not gate. \* p95 from fewer than 100 samples is close to the largest observed value and only indicative.
 
 ## Block diagnostics
 

@@ -99,21 +99,26 @@ final class RunComparator
 
     /**
      * The units the shift estimate resamples within: the paired blocks when
-     * both runs recorded them, otherwise (an interrupted run) the pooled
-     * samples as one pair.
+     * they cover every recorded sample, otherwise the pooled samples as one
+     * pair. An interrupted run leaves blocks without a partner; estimating
+     * from the matched blocks alone would gate on different samples than the
+     * medians the report shows, so such a cell falls back to the pool.
      *
      * @return list<SamplePair>
      */
     private static function samplePairs(BlockComparisonCollection $blocks, SampleCollection $baseline, SampleCollection $candidate): array
     {
-        if ($blocks->empty()) {
-            return [new SamplePair(baseline: $baseline, candidate: $candidate)];
-        }
-
-        return array_map(
+        $pairs = array_map(
             fn (BlockComparison $block): SamplePair => new SamplePair(baseline: $block->baselineSamples, candidate: $block->candidateSamples),
             $blocks->getItems(),
         );
+        $pairedBaseline = array_sum(array_map(fn (SamplePair $pair): int => count($pair->baseline), $pairs));
+        $pairedCandidate = array_sum(array_map(fn (SamplePair $pair): int => count($pair->candidate), $pairs));
+        if ($pairs === [] || $pairedBaseline !== count($baseline) || $pairedCandidate !== count($candidate)) {
+            return [new SamplePair(baseline: $baseline, candidate: $candidate)];
+        }
+
+        return $pairs;
     }
 
     /**

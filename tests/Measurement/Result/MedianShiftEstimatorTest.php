@@ -54,6 +54,27 @@ final class MedianShiftEstimatorTest extends TestCase
         self::assertTrue($shift->excludesZero());
     }
 
+    public function testASingleSampleSideYieldsNoIntervalAndNeverGates(): void
+    {
+        // One sample per side resamples to itself every time; a collapsed
+        // interval would make a single slow observation look certain.
+        $shift = (new MedianShiftEstimator(resamples: 20))->estimate([
+            self::pair(baseline: [
+                10,
+                10,
+            ], candidate: [
+                10,
+                10,
+            ]),
+            self::pair(baseline: [10], candidate: [50]),
+        ]);
+
+        self::assertSame(0.0, $shift->estimatePct);
+        self::assertFalse($shift->hasInterval());
+        self::assertFalse($shift->excludesZero());
+        self::assertFalse((new MedianShiftEstimator(resamples: 20))->estimate([self::pair(baseline: [10], candidate: [50])])->isRegressionBeyond(0.0));
+    }
+
     public function testIdenticalDistributionsKeepZeroInsideTheInterval(): void
     {
         $samples = [
@@ -126,6 +147,19 @@ final class MedianShiftEstimatorTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
         new SamplePair(baseline: SampleCollection::fromArray([1]), candidate: SampleCollection::fromArray([]));
+    }
+
+    public function testAPairRefusesANonPositiveSample(): void
+    {
+        // A zero baseline has no relative shift; it must not read as 0%.
+        $this->expectException(InvalidArgumentException::class);
+        new SamplePair(baseline: SampleCollection::fromArray([
+            0,
+            0,
+        ]), candidate: SampleCollection::fromArray([
+            5,
+            5,
+        ]));
     }
 
     public function testAShiftRefusesAnInvertedInterval(): void
