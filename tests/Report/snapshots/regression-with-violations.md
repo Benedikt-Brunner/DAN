@@ -15,7 +15,7 @@ Protocol: 5 warmup + 30 measured iterations in 4 blocks, 2 warmup at the start o
 
 ## S / mysql-8.0
 
-| Scenario | Statements | SQL | Median A | Median B | Delta | p95 A | p95 B |
+| Scenario | Statements | SQL | Median baseline | Median candidate | Delta | p95 baseline | p95 candidate |
 |---|---|---|---:|---:|---:|---:|---:|
 | product.deep-read | 4 -> 4 | unchanged | 12.50ms | 19.40ms | +55.2% | 14.10ms | 26.00ms |
 | product.keyword-listing | 4 -> 4 | :warning: changed (0) | 8.20ms | 8.30ms | +1.2% :grey_question: blocks disagree | 9.90ms | 10.00ms |

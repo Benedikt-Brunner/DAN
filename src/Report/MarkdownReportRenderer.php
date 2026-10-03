@@ -119,11 +119,11 @@ final class MarkdownReportRenderer
                     'Scenario',
                     'Statements',
                     'SQL',
-                    'Median A',
-                    'Median B',
+                    'Median baseline',
+                    'Median candidate',
                     'Delta',
-                    'p95 A',
-                    'p95 B',
+                    'p95 baseline',
+                    'p95 candidate',
                 ])
                 ->line('|---|---|---|---:|---:|---:|---:|---:|');
 
