@@ -12,7 +12,6 @@ use Dan\Harness\Gate\Policy;
 use Dan\Harness\Gate\Violation;
 use Dan\Harness\Gate\ViolationKind;
 use Dan\Harness\Measurement\Result\MedianShiftEstimator;
-use Dan\Harness\Measurement\Scheduling\RunSlot;
 use Dan\Harness\RunStore\Artifact\RunManifest;
 use Dan\Lib\Protocol\StatementDivergence;
 use Dan\Lib\Time\Duration;
@@ -233,7 +232,7 @@ final class MarkdownReportRenderer
 
         return sprintf(
             '%s #%d %s (%d/%d)',
-            $instability->slot === RunSlot::Baseline ? 'A' : 'B',
+            $instability->slot->value,
             $instability->index,
             $kind,
             $instability->observed,
