@@ -6,6 +6,8 @@ namespace Dan\Harness\RunStore\Artifact;
 
 use Dan\Harness\Measurement\Result\SampleCollection;
 use Dan\Lib\Collections\Collection;
+use Dan\Lib\Order\Ordering;
+use Dan\Lib\Order\Sort;
 use RuntimeException;
 
 /**
@@ -45,16 +47,25 @@ final readonly class BlockResultCollection extends Collection
      */
     public static function inExecutionOrder(array $blocks): self
     {
-        $byExecutionOrder = [];
-        foreach ($blocks as $block) {
-            if (isset($byExecutionOrder[$block->executionOrder])) {
+        $sorted = Sort::ascending($blocks);
+        foreach ($sorted as $position => $block) {
+            if ($position > 0 && $sorted[$position - 1]->compareTo($block) === Ordering::Equal) {
                 throw new RuntimeException(sprintf('Measurement block at execution position %d was recorded twice.', $block->executionOrder));
             }
-            $byExecutionOrder[$block->executionOrder] = $block;
         }
-        ksort($byExecutionOrder);
 
-        return self::create(array_values($byExecutionOrder));
+        return self::create($sorted);
+    }
+
+    public function findByBlockIndex(int $blockIndex): ?BlockResult
+    {
+        foreach ($this as $block) {
+            if ($block->blockIndex === $blockIndex) {
+                return $block;
+            }
+        }
+
+        return null;
     }
 
     public function merge(self $other): self
