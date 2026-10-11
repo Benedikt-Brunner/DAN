@@ -200,7 +200,8 @@ final class CellResultTest extends TestCase
                         400_000,
                         410_000,
                     ],
-                    'divergent' => false,
+                    'observed' => 2,
+                    'divergence' => 'none',
                 ],
             ],
         ];

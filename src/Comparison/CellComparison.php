@@ -21,6 +21,7 @@ final class CellComparison
 
     /**
      * @param list<int> $changedStatementIndices
+     * @param list<StatementInstability> $unstableStatements positions that diverged within either run
      */
     public function __construct(
         public readonly ScenarioName $scenario,
@@ -37,9 +38,19 @@ final class CellComparison
         public readonly Duration $baselineP95Wall,
         public readonly Duration $candidateP95Wall,
         public readonly MedianShift $wallShift,
-        public readonly bool $divergent,
+        public readonly array $unstableStatements,
         public readonly BlockComparisonCollection $blocks,
     ) {}
+
+    /**
+     * True when either run's statement sequence was not identical in every
+     * iteration: the positional SQL comparison and the statement timings then
+     * describe subsets, and the report says which.
+     */
+    public function hasUnstableStatements(): bool
+    {
+        return $this->unstableStatements !== [];
+    }
 
     /**
      * The point estimate of the median shift - the headline number. Its

@@ -66,7 +66,8 @@ final class SqliteIndexer
                 sql TEXT NOT NULL,
                 median_ms REAL NOT NULL,
                 p95_ms REAL NOT NULL,
-                divergent INTEGER NOT NULL,
+                observed INTEGER NOT NULL,
+                divergence TEXT NOT NULL,
                 PRIMARY KEY (scenario, tier, engine, engine_version, statement_index)
             );
             SQL);
@@ -81,7 +82,7 @@ final class SqliteIndexer
 
         $insertCell = $pdo->prepare('INSERT INTO cell VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
         $insertBlock = $pdo->prepare('INSERT INTO block VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
-        $insertStatement = $pdo->prepare('INSERT INTO statement VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
+        $insertStatement = $pdo->prepare('INSERT INTO statement VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
 
         $pdo->beginTransaction();
         foreach ($run->allCells() as $cell) {
@@ -104,7 +105,7 @@ final class SqliteIndexer
             $wallSamples = $cell->wallSamples();
             $divergent = false;
             foreach ($statements as $statement) {
-                $divergent = $divergent || $statement->divergent;
+                $divergent = $divergent || $statement->divergence->isDivergent();
                 $statementStatistics = Statistics::create($statement->durationSamples);
                 $insertStatement->execute([
                     $cell->scenario->toString(),
@@ -115,7 +116,8 @@ final class SqliteIndexer
                     $statement->sql,
                     $statementStatistics->median()->toMsFloat(),
                     $statementStatistics->percentile(Statistics::P95)->toMsFloat(),
-                    (int) $statement->divergent,
+                    $statement->observed,
+                    $statement->divergence->value,
                 ]);
             }
             $wallStatistics = Statistics::create($wallSamples);

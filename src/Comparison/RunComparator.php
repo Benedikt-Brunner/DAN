@@ -10,9 +10,11 @@ use Dan\Harness\Measurement\Result\MedianShiftEstimator;
 use Dan\Harness\Measurement\Result\SampleCollection;
 use Dan\Harness\Measurement\Result\SamplePair;
 use Dan\Harness\Measurement\Result\Statistics;
+use Dan\Harness\Measurement\Scheduling\RunSlot;
 use Dan\Harness\RunStore\Artifact\BlockResultCollection;
 use Dan\Harness\RunStore\Artifact\CellResult;
 use Dan\Harness\RunStore\Artifact\StatementProfile;
+use Dan\Harness\RunStore\Artifact\StatementProfileCollection;
 use Dan\Harness\RunStore\Filesystem\RunDirectory;
 use Dan\Lib\Order\Sort;
 
@@ -65,16 +67,12 @@ final class RunComparator
             }
         }
 
-        $divergent = array_reduce(
-            [
-                ...$baselineStatements->getItems(),
-                ...$candidateStatements->getItems(),
-            ],
-            fn (bool $carry, StatementProfile $statement) => $carry || $statement->divergent,
-            false,
-        );
         $baselineWall = $baselineCell->wallSamples();
         $candidateWall = $candidateCell->wallSamples();
+        $unstableStatements = [
+            ...self::unstableStatements(slot: RunSlot::Baseline, statements: $baselineStatements, iterations: count($baselineWall)),
+            ...self::unstableStatements(slot: RunSlot::Candidate, statements: $candidateStatements, iterations: count($candidateWall)),
+        ];
         $baselineWallStatistics = Statistics::create($baselineWall);
         $candidateWallStatistics = Statistics::create($candidateWall);
         $blocks = self::compareBlocks(baseline: $baselineCell->blocks, candidate: $candidateCell->blocks);
@@ -99,9 +97,31 @@ final class RunComparator
                 candidate: $candidateWall,
                 shiftEstimator: $shiftEstimator,
             ),
-            divergent: $divergent,
+            unstableStatements: $unstableStatements,
             blocks: $blocks,
         );
+    }
+
+    /**
+     * @return list<StatementInstability>
+     */
+    private static function unstableStatements(RunSlot $slot, StatementProfileCollection $statements, int $iterations): array
+    {
+        $unstable = [];
+        foreach ($statements as $statement) {
+            if (!$statement->divergence->isDivergent()) {
+                continue;
+            }
+            $unstable[] = new StatementInstability(
+                slot: $slot,
+                index: $statement->index,
+                divergence: $statement->divergence,
+                observed: $statement->observed,
+                iterations: $iterations,
+            );
+        }
+
+        return $unstable;
     }
 
     /**

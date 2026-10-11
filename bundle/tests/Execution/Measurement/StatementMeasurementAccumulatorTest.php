@@ -11,19 +11,11 @@ use PHPUnit\Framework\TestCase;
 
 final class StatementMeasurementAccumulatorTest extends TestCase
 {
-    public function testBuildsAnImmutableResultAndDetectsDivergentSql(): void
+    public function testAStablePositionObservedInEveryIterationIsNotDivergent(): void
     {
         $measurement = new StatementMeasurementAccumulator(index: 0, sql: 'SELECT 1');
-        $measurement->record(new RecordedStatement(
-            sql: 'SELECT 1',
-            params: null,
-            duration: Duration::fromNs(10),
-        ));
-        $measurement->record(new RecordedStatement(
-            sql: 'SELECT 2',
-            params: null,
-            duration: Duration::fromNs(20),
-        ));
+        $measurement->record(self::statement(sql: 'SELECT 1', ns: 10));
+        $measurement->record(self::statement(sql: 'SELECT 1', ns: 20));
 
         self::assertSame([
             'index' => 0,
@@ -32,7 +24,49 @@ final class StatementMeasurementAccumulatorTest extends TestCase
                 10,
                 20,
             ],
-            'divergent' => true,
-        ], $measurement->result()->toArray());
+            'observed' => 2,
+            'divergence' => 'none',
+        ], $measurement->result(2)->toArray());
+    }
+
+    public function testDifferentSqlAtThePositionIsTextDivergence(): void
+    {
+        $measurement = new StatementMeasurementAccumulator(index: 0, sql: 'SELECT 1');
+        $measurement->record(self::statement(sql: 'SELECT 1', ns: 10));
+        $measurement->record(self::statement(sql: 'SELECT 2', ns: 20));
+
+        $result = $measurement->result(2)->toArray();
+
+        self::assertSame('SELECT 1', $result['sql'], 'The first observed SQL names the position.');
+        self::assertSame('text', $result['divergence']);
+        self::assertSame(2, $result['observed']);
+    }
+
+    public function testAPositionMissingFromSomeIterationsIsPresenceDivergence(): void
+    {
+        // Observed in 1 of 3 iterations: the timings describe a subset and
+        // must be labelled as such, whatever the SQL looked like.
+        $measurement = new StatementMeasurementAccumulator(index: 4, sql: 'SELECT 1');
+        $measurement->record(self::statement(sql: 'SELECT 1', ns: 10));
+
+        $result = $measurement->result(3)->toArray();
+
+        self::assertSame('presence', $result['divergence']);
+        self::assertSame(1, $result['observed']);
+        self::assertSame([10], $result['durationsNsSamples']);
+    }
+
+    public function testTextAndPresenceDivergenceAreReportedTogether(): void
+    {
+        $measurement = new StatementMeasurementAccumulator(index: 1, sql: 'SELECT 1');
+        $measurement->record(self::statement(sql: 'SELECT 1', ns: 10));
+        $measurement->record(self::statement(sql: 'SELECT 3', ns: 30));
+
+        self::assertSame('text-and-presence', $measurement->result(5)->toArray()['divergence']);
+    }
+
+    private static function statement(string $sql, int $ns): RecordedStatement
+    {
+        return new RecordedStatement(sql: $sql, params: null, duration: Duration::fromNs($ns));
     }
 }
