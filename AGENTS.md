@@ -106,6 +106,7 @@ php-cs-fixer (PER-CS 2.0 + Symfony + project rules), phpcs (PSR-12 + custom snif
 - **Named arguments** on every call into `Dan\*` code passing two or more arguments (custom PHPStan rule `dan.namedArguments`; vendor callees, single-argument calls, and variadics exempt).
 - **Multi-entry arrays put every entry on its own line**, including nested arrays (custom sniff, auto-fixable). Single-entry arrays may stay inline.
 - **No `static fn` and no inline `static function`** (custom sniff; named static methods are fine — `static_lambda` is disabled in php-cs-fixer so it can't reintroduce them).
+- **Class members are ordered:** traits, enum cases, constants, properties, then the constructor, all before any method (`ordered_class_elements`, auto-fixable). Methods keep their authored order.
 - **Empty function bodies collapse to `{}`** on the signature line: `public function __construct(...) {}` (`single_line_empty_body`).
 - Trailing commas in all multiline constructs; alphabetically ordered imports; global classes imported via `use` (`use RuntimeException;`); no yoda conditions; ` . ` concatenation with spaces.
 - **Forbidden functions:** `var_dump`, `print_r` (leak into recorded artifacts), `sleep`, `usleep` (skew latency samples — use `Duration::sleep()`; the Docker readiness probe is the sole exclusion).

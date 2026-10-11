@@ -13,6 +13,13 @@ use Dan\Lib\Time\Duration;
 final class CellComparison
 {
     /**
+     * p95 of a few dozen samples is essentially the second-largest one and
+     * swings wildly between sessions; below this many samples the report
+     * labels it indicative.
+     */
+    public const int RELIABLE_P95_SAMPLES = 100;
+
+    /**
      * @param list<int> $changedStatementIndices
      */
     public function __construct(
@@ -42,13 +49,6 @@ final class CellComparison
     {
         return $this->wallShift->estimatePct;
     }
-
-    /**
-     * p95 of a few dozen samples is essentially the second-largest one and
-     * swings wildly between sessions; below this many samples the report
-     * labels it indicative.
-     */
-    public const int RELIABLE_P95_SAMPLES = 100;
 
     public function p95IsIndicativeOnly(): bool
     {
