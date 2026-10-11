@@ -111,11 +111,12 @@ final class RunComparatorTest extends TestCase
         self::assertCount(2, $violations);
     }
 
-    public function testUnmatchedBlocksMakeTheShiftUseTheSamePooledSamplesAsTheReportedMedians(): void
+    public function testUnmatchedBlocksKeepThePooledEstimateButCannotGate(): void
     {
         // The baseline's second block has no candidate partner (an
-        // interrupted run). Matched blocks alone would estimate +100%; the
-        // reported medians are 55ms -> 20ms, and the gate must judge those.
+        // interrupted run). The estimate is the shift between the reported
+        // medians (55ms -> 200ms), but without complete block pairs there is
+        // no honest interval, so even this large regression does not gate.
         $baseline = $this->writeRun(slot: RunSlot::Baseline, wallNs: [], sql: 'SELECT `id` FROM `product`', blocks: [
             [
                 0,
@@ -133,8 +134,8 @@ final class RunComparatorTest extends TestCase
             ],
         ]);
         $candidate = $this->writeRun(slot: RunSlot::Candidate, wallNs: [
-            20_000_000,
-            20_000_000,
+            200_000_000,
+            200_000_000,
         ], sql: 'SELECT `id` FROM `product`');
 
         $cell = RunComparator::compare(baseline: $baseline, candidate: $candidate, shiftEstimator: new MedianShiftEstimator(resamples: 50))->cells[0];
@@ -142,7 +143,8 @@ final class RunComparatorTest extends TestCase
         self::assertCount(1, $cell->blocks);
         self::assertSame(55.0, $cell->baselineMedianWall->toMsFloat());
         self::assertSame(LatencyDelta::percent(baseline: $cell->baselineMedianWall, candidate: $cell->candidateMedianWall), $cell->wallShift->estimatePct);
-        self::assertLessThan(0.0, $cell->wallShift->estimatePct);
+        self::assertFalse($cell->wallShift->hasInterval());
+        self::assertSame([], (new Policy(maxWallRegressionPct: 5.0, failOnSqlChange: false))->evaluate([$cell]));
     }
 
     public function testPairsBlocksByIndexAndExposesOrderEffects(): void

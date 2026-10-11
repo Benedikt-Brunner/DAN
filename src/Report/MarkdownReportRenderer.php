@@ -162,7 +162,7 @@ final class MarkdownReportRenderer
 
             $notes = [sprintf('Delta: estimated median shift with its %d%% bootstrap interval.', (int) round(MedianShiftEstimator::CONFIDENCE * 100))];
             if ($shiftWithoutInterval) {
-                $notes[] = sprintf('"no interval": a block pair has fewer than %d samples on a side, so the shift cannot be resampled and does not gate.', MedianShiftEstimator::MIN_SAMPLES_PER_SIDE);
+                $notes[] = sprintf('"no interval": a block pair has fewer than %d samples on a side, or a block lacks its mirrored partner (an interrupted run), so the shift cannot be resampled and does not gate.', MedianShiftEstimator::MIN_SAMPLES_PER_SIDE);
             }
             if ($p95IndicativeOnly) {
                 $notes[] = sprintf('\* p95 from fewer than %d samples is close to the largest observed value and only indicative.', CellComparison::RELIABLE_P95_SAMPLES);
