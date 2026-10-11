@@ -1,6 +1,6 @@
 # DAN profile diff
 
-| | A (baseline) | B (candidate) |
+| | Baseline | Candidate |
 |---|---|---|
 | Implementation | v6.6.10.22 | local checkout |
 | Identity | `baseline-bbbbbbbb` | `candidate-bbbbbbb` |

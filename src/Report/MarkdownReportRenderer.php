@@ -12,6 +12,7 @@ use Dan\Harness\Gate\Policy;
 use Dan\Harness\Gate\Violation;
 use Dan\Harness\Gate\ViolationKind;
 use Dan\Harness\Measurement\Result\MedianShiftEstimator;
+use Dan\Harness\Measurement\Scheduling\RunSlot;
 use Dan\Harness\RunStore\Artifact\RunManifest;
 use Dan\Lib\Protocol\StatementDivergence;
 use Dan\Lib\Time\Duration;
@@ -39,8 +40,8 @@ final class MarkdownReportRenderer
         $this->appendViolations(markdown: $markdown, violations: $violations);
         $this->appendCellTables(markdown: $markdown, cells: $comparison->cells);
         $this->appendBlockDiagnostics(markdown: $markdown, cells: $comparison->cells);
-        $this->appendMissingCells(markdown: $markdown, side: 'A', cells: $comparison->cellsOnlyInBaseline);
-        $this->appendMissingCells(markdown: $markdown, side: 'B', cells: $comparison->cellsOnlyInCandidate);
+        $this->appendMissingCells(markdown: $markdown, slot: RunSlot::Baseline, cells: $comparison->cellsOnlyInBaseline);
+        $this->appendMissingCells(markdown: $markdown, slot: RunSlot::Candidate, cells: $comparison->cellsOnlyInCandidate);
 
         return $markdown->build();
     }
@@ -50,7 +51,7 @@ final class MarkdownReportRenderer
         $markdown
             ->heading(title: 'DAN profile diff', level: 1)
             ->blankLine()
-            ->line('| | A (baseline) | B (candidate) |')
+            ->line('| | Baseline | Candidate |')
             ->line('|---|---|---|')
             ->tableRow([
                 'Implementation',
@@ -311,7 +312,7 @@ final class MarkdownReportRenderer
     /**
      * @param list<string> $cells
      */
-    private function appendMissingCells(MarkdownBuilder $markdown, string $side, array $cells): void
+    private function appendMissingCells(MarkdownBuilder $markdown, RunSlot $slot, array $cells): void
     {
         if ($cells === []) {
             return;
@@ -319,7 +320,7 @@ final class MarkdownReportRenderer
 
         $formattedCells = array_map(fn (string $cell): string => sprintf('`%s`', $cell), $cells);
         $markdown
-            ->line(sprintf('Cells only present in run %s: %s', $side, implode(', ', $formattedCells)))
+            ->line(sprintf('Cells only present in the %s run: %s', $slot->value, implode(', ', $formattedCells)))
             ->blankLine();
     }
 
