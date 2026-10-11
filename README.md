@@ -37,7 +37,7 @@ bin/dan run --dal ../shopware --db mysql:8.0 --tier S
 bin/dan diff runs/<session>/baseline runs/<session>/candidate --out report.md
 ```
 
-A/B runs write `runs/<session>/report.md` (PR-comment-ready markdown) and exit non-zero on gate violations (`--max-regression`, default 15%; `--fail-on-sql-change` opt-in).
+A/B runs write `runs/<session>/report.md` (PR-comment-ready markdown) and exit non-zero on gate violations (`--max-regression`, default 15%; `--fail-on-sql-change` opt-in). The latency gate decides over the two sample distributions, not two medians: a cell violates only when the bootstrap interval of the median shift excludes zero *and* the estimated shift exceeds the threshold. The report prints the estimate with its interval, and marks p95 values from fewer than 100 samples as indicative.
 
 ## Development
 

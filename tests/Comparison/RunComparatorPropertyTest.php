@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Dan\Harness\Tests\Comparison;
 
 use Dan\Harness\Comparison\RunComparator;
+use Dan\Harness\Measurement\Result\MedianShiftEstimator;
 use Dan\Harness\Measurement\Result\SampleCollection;
 use Dan\Harness\RunStore\Artifact\BlockResult;
 use Dan\Harness\RunStore\Artifact\BlockResultCollection;
@@ -46,7 +47,7 @@ final class RunComparatorPropertyTest extends PropertyTestCase
                     $written = $this->writeRun(directory: $baseline, manifest: $manifest, cells: $cells);
                     $this->writeRun(directory: $candidate, manifest: $manifest, cells: $cells);
 
-                    $comparison = RunComparator::compare(baseline: $baseline, candidate: $candidate);
+                    $comparison = RunComparator::compare(baseline: $baseline, candidate: $candidate, shiftEstimator: new MedianShiftEstimator(resamples: 50));
 
                     self::assertTrue($comparison->protocolsMatch);
                     self::assertSame([], $comparison->cellsOnlyInBaseline);
@@ -58,6 +59,7 @@ final class RunComparatorPropertyTest extends PropertyTestCase
                         self::assertFalse($cell->sqlChanged);
                         self::assertSame([], $cell->changedStatementIndices);
                         self::assertSame(0.0, $cell->wallDeltaPct());
+                        self::assertFalse($cell->wallShift->excludesZero(), 'Identical runs must never look significantly different.');
                         self::assertSame($cell->baselineStatementCount, $cell->candidateStatementCount);
                         self::assertSame($cell->baselineMedianWall->toNsFloat(), $cell->candidateMedianWall->toNsFloat());
                         self::assertSame($cell->baselineP95Wall->toNsFloat(), $cell->candidateP95Wall->toNsFloat());
@@ -96,7 +98,7 @@ final class RunComparatorPropertyTest extends PropertyTestCase
                     $this->writeRun(directory: $baseline, manifest: $manifest, cells: [$this->withRewrittenSql(cell: $cell, positions: [], divergent: !$candidateCarriesDivergence)]);
                     $this->writeRun(directory: $candidate, manifest: $manifest, cells: [$rewritten]);
 
-                    $comparison = RunComparator::compare(baseline: $baseline, candidate: $candidate);
+                    $comparison = RunComparator::compare(baseline: $baseline, candidate: $candidate, shiftEstimator: new MedianShiftEstimator(resamples: 50));
 
                     self::assertCount(1, $comparison->cells);
                     self::assertSame($changedPositions !== [], $comparison->cells[0]->sqlChanged);
@@ -127,7 +129,7 @@ final class RunComparatorPropertyTest extends PropertyTestCase
                     $this->writeRun(directory: $baseline, manifest: $manifest, cells: array_values(array_diff_key($all, [$first => true])));
                     $this->writeRun(directory: $candidate, manifest: $manifest, cells: array_values(array_diff_key($all, [$last => true])));
 
-                    $comparison = RunComparator::compare(baseline: $baseline, candidate: $candidate);
+                    $comparison = RunComparator::compare(baseline: $baseline, candidate: $candidate, shiftEstimator: new MedianShiftEstimator(resamples: 50));
 
                     self::assertSame($first === $last ? [] : [$last], $comparison->cellsOnlyInBaseline);
                     self::assertSame($first === $last ? [] : [$first], $comparison->cellsOnlyInCandidate);

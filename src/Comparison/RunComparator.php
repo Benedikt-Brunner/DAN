@@ -4,15 +4,25 @@ declare(strict_types=1);
 
 namespace Dan\Harness\Comparison;
 
+use Dan\Harness\Measurement\Result\LatencyDelta;
+use Dan\Harness\Measurement\Result\MedianShift;
+use Dan\Harness\Measurement\Result\MedianShiftEstimator;
+use Dan\Harness\Measurement\Result\SampleCollection;
+use Dan\Harness\Measurement\Result\SamplePair;
 use Dan\Harness\Measurement\Result\Statistics;
 use Dan\Harness\RunStore\Artifact\BlockResultCollection;
+use Dan\Harness\RunStore\Artifact\CellResult;
 use Dan\Harness\RunStore\Artifact\StatementProfile;
 use Dan\Harness\RunStore\Filesystem\RunDirectory;
 use Dan\Lib\Order\Sort;
 
 final class RunComparator
 {
-    public static function compare(RunDirectory $baseline, RunDirectory $candidate): RunComparison
+    /**
+     * The estimator is injectable so tests can trade resamples for speed;
+     * production runs use its defaults.
+     */
+    public static function compare(RunDirectory $baseline, RunDirectory $candidate, MedianShiftEstimator $shiftEstimator = new MedianShiftEstimator()): RunComparison
     {
         $baselineManifest = $baseline->manifest();
         $candidateManifest = $candidate->manifest();
@@ -23,47 +33,10 @@ final class RunComparator
 
         $cells = [];
         foreach ($sharedFiles as $fileName) {
-            $baselineCell = $baseline->readCellByFileName($fileName);
-            $candidateCell = $candidate->readCellByFileName($fileName);
-
-            $baselineStatements = $baselineCell->statements();
-            $candidateStatements = $candidateCell->statements();
-            $normalizedBaseline = array_map(fn (StatementProfile $statement) => SqlNormalizer::normalize($statement->sql), $baselineStatements->getItems());
-            $normalizedCandidate = array_map(fn (StatementProfile $statement) => SqlNormalizer::normalize($statement->sql), $candidateStatements->getItems());
-
-            $changedIndices = [];
-            $max = max(count($normalizedBaseline), count($normalizedCandidate));
-            for ($i = 0; $i < $max; ++$i) {
-                if (($normalizedBaseline[$i] ?? null) !== ($normalizedCandidate[$i] ?? null)) {
-                    $changedIndices[] = $i;
-                }
-            }
-
-            $divergent = array_reduce(
-                [
-                    ...$baselineStatements->getItems(),
-                    ...$candidateStatements->getItems(),
-                ],
-                fn (bool $carry, StatementProfile $statement) => $carry || $statement->divergent,
-                false,
-            );
-            $baselineWallStatistics = Statistics::create($baselineCell->wallSamples());
-            $candidateWallStatistics = Statistics::create($candidateCell->wallSamples());
-
-            $cells[] = new CellComparison(
-                scenario: $baselineCell->scenario,
-                tier: $baselineCell->tier,
-                database: $baselineCell->database,
-                baselineStatementCount: count($baselineStatements),
-                candidateStatementCount: count($candidateStatements),
-                sqlChanged: $changedIndices !== [],
-                changedStatementIndices: $changedIndices,
-                baselineMedianWall: $baselineWallStatistics->median(),
-                candidateMedianWall: $candidateWallStatistics->median(),
-                baselineP95Wall: $baselineWallStatistics->percentile(Statistics::P95),
-                candidateP95Wall: $candidateWallStatistics->percentile(Statistics::P95),
-                divergent: $divergent,
-                blocks: self::compareBlocks(baseline: $baselineCell->blocks, candidate: $candidateCell->blocks),
+            $cells[] = self::compareCell(
+                baselineCell: $baseline->readCellByFileName($fileName),
+                candidateCell: $candidate->readCellByFileName($fileName),
+                shiftEstimator: $shiftEstimator,
             );
         }
 
@@ -75,6 +48,92 @@ final class RunComparator
             cellsOnlyInBaseline: array_values(array_diff($baselineFiles, $candidateFiles)),
             cellsOnlyInCandidate: array_values(array_diff($candidateFiles, $baselineFiles)),
         );
+    }
+
+    private static function compareCell(CellResult $baselineCell, CellResult $candidateCell, MedianShiftEstimator $shiftEstimator): CellComparison
+    {
+        $baselineStatements = $baselineCell->statements();
+        $candidateStatements = $candidateCell->statements();
+        $normalizedBaseline = array_map(fn (StatementProfile $statement) => SqlNormalizer::normalize($statement->sql), $baselineStatements->getItems());
+        $normalizedCandidate = array_map(fn (StatementProfile $statement) => SqlNormalizer::normalize($statement->sql), $candidateStatements->getItems());
+
+        $changedIndices = [];
+        $max = max(count($normalizedBaseline), count($normalizedCandidate));
+        for ($i = 0; $i < $max; ++$i) {
+            if (($normalizedBaseline[$i] ?? null) !== ($normalizedCandidate[$i] ?? null)) {
+                $changedIndices[] = $i;
+            }
+        }
+
+        $divergent = array_reduce(
+            [
+                ...$baselineStatements->getItems(),
+                ...$candidateStatements->getItems(),
+            ],
+            fn (bool $carry, StatementProfile $statement) => $carry || $statement->divergent,
+            false,
+        );
+        $baselineWall = $baselineCell->wallSamples();
+        $candidateWall = $candidateCell->wallSamples();
+        $baselineWallStatistics = Statistics::create($baselineWall);
+        $candidateWallStatistics = Statistics::create($candidateWall);
+        $blocks = self::compareBlocks(baseline: $baselineCell->blocks, candidate: $candidateCell->blocks);
+
+        return new CellComparison(
+            scenario: $baselineCell->scenario,
+            tier: $baselineCell->tier,
+            database: $baselineCell->database,
+            baselineStatementCount: count($baselineStatements),
+            candidateStatementCount: count($candidateStatements),
+            sqlChanged: $changedIndices !== [],
+            changedStatementIndices: $changedIndices,
+            baselineSampleCount: count($baselineWall),
+            candidateSampleCount: count($candidateWall),
+            baselineMedianWall: $baselineWallStatistics->median(),
+            candidateMedianWall: $candidateWallStatistics->median(),
+            baselineP95Wall: $baselineWallStatistics->percentile(Statistics::P95),
+            candidateP95Wall: $candidateWallStatistics->percentile(Statistics::P95),
+            wallShift: self::wallShift(
+                blocks: $blocks,
+                baseline: $baselineWall,
+                candidate: $candidateWall,
+                shiftEstimator: $shiftEstimator,
+            ),
+            divergent: $divergent,
+            blocks: $blocks,
+        );
+    }
+
+    /**
+     * The shift estimate resamples within mirrored block pairs, so its
+     * interval reflects the session's block design. That needs the pairs to
+     * cover every recorded sample: an interrupted run leaves blocks without a
+     * partner, and neither the matched blocks alone (different samples than
+     * the reported medians) nor the pool (iterations treated as independent
+     * draws, understating drift) yields an honest interval. Such a cell keeps
+     * the pooled point estimate - the shift between the reported medians -
+     * without an interval, so it cannot gate.
+     */
+    private static function wallShift(
+        BlockComparisonCollection $blocks,
+        SampleCollection $baseline,
+        SampleCollection $candidate,
+        MedianShiftEstimator $shiftEstimator,
+    ): MedianShift {
+        $pairs = array_map(
+            fn (BlockComparison $block): SamplePair => new SamplePair(baseline: $block->baselineSamples, candidate: $block->candidateSamples),
+            $blocks->getItems(),
+        );
+        $pairedBaseline = array_sum(array_map(fn (SamplePair $pair): int => count($pair->baseline), $pairs));
+        $pairedCandidate = array_sum(array_map(fn (SamplePair $pair): int => count($pair->candidate), $pairs));
+        if ($pairs === [] || $pairedBaseline !== count($baseline) || $pairedCandidate !== count($candidate)) {
+            return MedianShift::withoutInterval(
+                estimatePct: LatencyDelta::percent(baseline: Statistics::create($baseline)->median(), candidate: Statistics::create($candidate)->median()),
+                confidence: MedianShiftEstimator::CONFIDENCE,
+            );
+        }
+
+        return $shiftEstimator->estimate($pairs);
     }
 
     /**
@@ -94,8 +153,8 @@ final class RunComparator
                 blockIndex: $baselineBlock->blockIndex,
                 baselineExecutionOrder: $baselineBlock->executionOrder,
                 candidateExecutionOrder: $candidateBlock->executionOrder,
-                baselineMedianWall: Statistics::create($baselineBlock->wallSamples)->median(),
-                candidateMedianWall: Statistics::create($candidateBlock->wallSamples)->median(),
+                baselineSamples: $baselineBlock->wallSamples,
+                candidateSamples: $candidateBlock->wallSamples,
             );
         }
 

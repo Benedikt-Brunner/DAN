@@ -8,6 +8,8 @@ use Dan\Harness\Comparison\RunComparator;
 use Dan\Harness\Gate\Policy;
 use Dan\Harness\Implementation\Identity\Identity;
 use Dan\Harness\Implementation\Reference\ReferenceType;
+use Dan\Harness\Measurement\Result\LatencyDelta;
+use Dan\Harness\Measurement\Result\MedianShiftEstimator;
 use Dan\Harness\Measurement\Result\SampleCollection;
 use Dan\Harness\Measurement\Scheduling\RunSlot;
 use Dan\Harness\Protocol\DatabaseTarget;
@@ -107,6 +109,42 @@ final class RunComparatorTest extends TestCase
 
         $violations = (new Policy(maxWallRegressionPct: 15.0, failOnSqlChange: true))->evaluate($comparison->cells);
         self::assertCount(2, $violations);
+    }
+
+    public function testUnmatchedBlocksKeepThePooledEstimateButCannotGate(): void
+    {
+        // The baseline's second block has no candidate partner (an
+        // interrupted run). The estimate is the shift between the reported
+        // medians (55ms -> 200ms), but without complete block pairs there is
+        // no honest interval, so even this large regression does not gate.
+        $baseline = $this->writeRun(slot: RunSlot::Baseline, wallNs: [], sql: 'SELECT `id` FROM `product`', blocks: [
+            [
+                0,
+                [
+                    10_000_000,
+                    10_000_000,
+                ],
+            ],
+            [
+                2,
+                [
+                    100_000_000,
+                    100_000_000,
+                ],
+            ],
+        ]);
+        $candidate = $this->writeRun(slot: RunSlot::Candidate, wallNs: [
+            200_000_000,
+            200_000_000,
+        ], sql: 'SELECT `id` FROM `product`');
+
+        $cell = RunComparator::compare(baseline: $baseline, candidate: $candidate, shiftEstimator: new MedianShiftEstimator(resamples: 50))->cells[0];
+
+        self::assertCount(1, $cell->blocks);
+        self::assertSame(55.0, $cell->baselineMedianWall->toMsFloat());
+        self::assertSame(LatencyDelta::percent(baseline: $cell->baselineMedianWall, candidate: $cell->candidateMedianWall), $cell->wallShift->estimatePct);
+        self::assertFalse($cell->wallShift->hasInterval());
+        self::assertSame([], (new Policy(maxWallRegressionPct: 5.0, failOnSqlChange: false))->evaluate([$cell]));
     }
 
     public function testPairsBlocksByIndexAndExposesOrderEffects(): void
