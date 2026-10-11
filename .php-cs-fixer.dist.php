@@ -30,6 +30,10 @@ return (new Config())
         'global_namespace_import' => ['import_classes' => true, 'import_constants' => false, 'import_functions' => false],
         'multiline_whitespace_before_semicolons' => ['strategy' => 'no_multi_line'],
         'native_function_invocation' => false,
+        // Constants, properties, and the constructor head every class, so a
+        // reader meets the type's vocabulary before its behavior. Methods are
+        // not listed and keep their authored order.
+        'ordered_class_elements' => ['order' => ['use_trait', 'case', 'constant', 'property', 'construct']],
         'ordered_imports' => ['imports_order' => ['class', 'function', 'const'], 'sort_algorithm' => 'alpha'],
         'phpdoc_align' => ['align' => 'left'],
         'phpdoc_to_comment' => false,
