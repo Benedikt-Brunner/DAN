@@ -1,6 +1,6 @@
 # DAN profile diff
 
-| | A (baseline) | B (candidate) |
+| | Baseline | Candidate |
 |---|---|---|
 | Implementation | v6.6.10.22 | v6.6.10.22 |
 | Identity | `baseline-aaaaaaaa` | `candidate-aaaaaaa` |
