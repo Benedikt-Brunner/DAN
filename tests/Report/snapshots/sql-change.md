@@ -21,7 +21,7 @@ Gate: a cell fails when its estimated median shift exceeds +10.0% and its 95% in
 | product.deep-read | 4 -> 5 | :warning: changed (1, 3) | 12.50ms | 12.60ms | +0.8% [-1.2%, +2.8%] | 14.10ms* | 14.30ms* |
 | synthetic.json-path | 4 -> 4 | unchanged :grey_question: A #3 intermittent (5/30); B #1 SQL varies (30/30) | 3.00ms | 3.10ms | +3.3% [no interval] | 3.40ms* | 3.50ms* |
 
-Delta: estimated median shift with its 95% bootstrap interval. "no interval": a block pair has fewer than 2 samples on a side, so the shift cannot be resampled and does not gate. \* p95 from fewer than 100 samples is close to the largest observed value and only indicative.
+Delta: estimated median shift with its 95% bootstrap interval. "no interval": a block pair has fewer than 2 samples on a side, or a block lacks its mirrored partner (an interrupted run), so the shift cannot be resampled and does not gate. \* p95 from fewer than 100 samples is close to the largest observed value and only indicative.
 
 ## Block diagnostics
 

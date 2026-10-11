@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Dan\Harness\Comparison;
 
+use Dan\Harness\Measurement\Result\LatencyDelta;
+use Dan\Harness\Measurement\Result\MedianShift;
 use Dan\Harness\Measurement\Result\MedianShiftEstimator;
 use Dan\Harness\Measurement\Result\SampleCollection;
 use Dan\Harness\Measurement\Result\SamplePair;
@@ -89,7 +91,12 @@ final class RunComparator
             candidateMedianWall: $candidateWallStatistics->median(),
             baselineP95Wall: $baselineWallStatistics->percentile(Statistics::P95),
             candidateP95Wall: $candidateWallStatistics->percentile(Statistics::P95),
-            wallShift: $shiftEstimator->estimate(self::samplePairs(blocks: $blocks, baseline: $baselineWall, candidate: $candidateWall)),
+            wallShift: self::wallShift(
+                blocks: $blocks,
+                baseline: $baselineWall,
+                candidate: $candidateWall,
+                shiftEstimator: $shiftEstimator,
+            ),
             unstableStatements: $unstableStatements,
             blocks: $blocks,
         );
@@ -118,16 +125,21 @@ final class RunComparator
     }
 
     /**
-     * The units the shift estimate resamples within: the paired blocks when
-     * they cover every recorded sample, otherwise the pooled samples as one
-     * pair. An interrupted run leaves blocks without a partner; estimating
-     * from the matched blocks alone would gate on different samples than the
-     * medians the report shows, so such a cell falls back to the pool.
-     *
-     * @return list<SamplePair>
+     * The shift estimate resamples within mirrored block pairs, so its
+     * interval reflects the session's block design. That needs the pairs to
+     * cover every recorded sample: an interrupted run leaves blocks without a
+     * partner, and neither the matched blocks alone (different samples than
+     * the reported medians) nor the pool (iterations treated as independent
+     * draws, understating drift) yields an honest interval. Such a cell keeps
+     * the pooled point estimate - the shift between the reported medians -
+     * without an interval, so it cannot gate.
      */
-    private static function samplePairs(BlockComparisonCollection $blocks, SampleCollection $baseline, SampleCollection $candidate): array
-    {
+    private static function wallShift(
+        BlockComparisonCollection $blocks,
+        SampleCollection $baseline,
+        SampleCollection $candidate,
+        MedianShiftEstimator $shiftEstimator,
+    ): MedianShift {
         $pairs = array_map(
             fn (BlockComparison $block): SamplePair => new SamplePair(baseline: $block->baselineSamples, candidate: $block->candidateSamples),
             $blocks->getItems(),
@@ -135,10 +147,13 @@ final class RunComparator
         $pairedBaseline = array_sum(array_map(fn (SamplePair $pair): int => count($pair->baseline), $pairs));
         $pairedCandidate = array_sum(array_map(fn (SamplePair $pair): int => count($pair->candidate), $pairs));
         if ($pairs === [] || $pairedBaseline !== count($baseline) || $pairedCandidate !== count($candidate)) {
-            return [new SamplePair(baseline: $baseline, candidate: $candidate)];
+            return MedianShift::withoutInterval(
+                estimatePct: LatencyDelta::percent(baseline: Statistics::create($baseline)->median(), candidate: Statistics::create($candidate)->median()),
+                confidence: MedianShiftEstimator::CONFIDENCE,
+            );
         }
 
-        return $pairs;
+        return $shiftEstimator->estimate($pairs);
     }
 
     /**

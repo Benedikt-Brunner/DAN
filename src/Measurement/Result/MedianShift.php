@@ -31,11 +31,12 @@ final class MedianShift
     }
 
     /**
-     * A shift whose uncertainty cannot be estimated: resampling a block pair
-     * with a single sample on one side reproduces that sample every time, so
-     * the bootstrap interval would collapse onto the estimate and fake a
+     * A shift whose uncertainty cannot be estimated honestly: resampling a
+     * block pair with a single sample on one side reproduces that sample
+     * every time, and unpaired blocks from an interrupted run leave no block
+     * structure to resample within. Either way an interval would fake a
      * certainty the measurement never had. The interval is unbounded instead,
-     * which never excludes zero - too few samples cannot gate.
+     * which never excludes zero - such a shift cannot gate.
      */
     public static function withoutInterval(float $estimatePct, float $confidence): self
     {
