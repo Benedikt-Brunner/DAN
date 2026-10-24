@@ -25,17 +25,16 @@ final readonly class SampleCollection extends Collection
     }
 
     /**
-     * Narrows untrusted json_decode() output into samples; the context names
-     * the field in the refusal so a malformed artifact points at itself.
+     * @param array<mixed> $payload
      */
-    public static function fromDecodedArray(mixed $payload, string $context): self
+    public static function fromDecodedArray(array $payload): self
     {
-        if (!is_array($payload) || !array_is_list($payload)) {
-            throw new RuntimeException(sprintf('Malformed %s: expected a list of integer nanoseconds.', $context));
+        if (!array_is_list($payload)) {
+            throw new RuntimeException('Malformed samples payload: expected a list.');
         }
         foreach ($payload as $sample) {
             if (!is_int($sample)) {
-                throw new RuntimeException(sprintf('Malformed %s: every sample must be an integer.', $context));
+                throw new RuntimeException('Malformed samples payload: every sample must be integer nanoseconds.');
             }
         }
 

@@ -7,7 +7,7 @@ Instructions for coding agents working in this repository. DAN profiles the SQL 
 Three Composer packages with separate vendor dirs, PHPStan configs, and test setups:
 
 - **Root (`dan/harness`)** — `Dan\Harness\` in `src/`, the plain Symfony Console application (`bin/dan`) that orchestrates runs. PHP ≥ 8.4; test runner is Pest.
-- **`lib/` (`dan/lib`)** — `Dan\Lib\` in `lib/src/`, framework-independent contracts and value objects shared by both runtime packages. PHP ≥ 8.2 (must load everywhere the probe does).
+- **`lib/` (`dan/lib`)** — `Dan\Lib\` in `lib/src/`, framework-independent contracts, value objects, and general-purpose building blocks shared by (or usable from) both runtime packages. PHP ≥ 8.2 (must load everywhere the probe does).
 - **`bundle/` (`dan/probe`)** — `Dan\Probe\` in `bundle/src/`, a Symfony bundle installed *inside* each DAL runtime under test. PHP ≥ 8.2 (matches supported DAL versions); test runner stays plain PHPUnit.
 
 The harness and probe communicate only via CLI: the harness builds a DAL runtime from a Shopware skeleton with the probe (Composer path repo), then invokes the probe's `dan:execute` / `dan:seed` commands and parses their JSON output.
@@ -106,6 +106,7 @@ php-cs-fixer (PER-CS 2.0 + Symfony + project rules), phpcs (PSR-12 + custom snif
 - **Named arguments** on every call into `Dan\*` code passing two or more arguments (custom PHPStan rule `dan.namedArguments`; vendor callees, single-argument calls, and variadics exempt).
 - **Multi-entry arrays put every entry on its own line**, including nested arrays (custom sniff, auto-fixable). Single-entry arrays may stay inline.
 - **No `static fn` and no inline `static function`** (custom sniff; named static methods are fine — `static_lambda` is disabled in php-cs-fixer so it can't reintroduce them).
+- **Class members are ordered:** traits, enum cases, constants, properties, then the constructor, all before any method (`ordered_class_elements`, auto-fixable). Methods keep their authored order.
 - **Empty function bodies collapse to `{}`** on the signature line: `public function __construct(...) {}` (`single_line_empty_body`).
 - Trailing commas in all multiline constructs; alphabetically ordered imports; global classes imported via `use` (`use RuntimeException;`); no yoda conditions; ` . ` concatenation with spaces.
 - **Forbidden functions:** `var_dump`, `print_r` (leak into recorded artifacts), `sleep`, `usleep` (skew latency samples — use `Duration::sleep()`; the Docker readiness probe is the sole exclusion).
