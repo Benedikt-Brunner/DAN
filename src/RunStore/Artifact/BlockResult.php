@@ -5,7 +5,11 @@ declare(strict_types=1);
 namespace Dan\Harness\RunStore\Artifact;
 
 use Dan\Harness\Measurement\Result\SampleCollection;
+use Dan\Lib\Order\Ordered;
+use Dan\Lib\Order\Ordering;
+use Dan\Lib\Order\TotallyOrdered;
 use Dan\Lib\Protocol\ResultSet;
+use LogicException;
 use RuntimeException;
 
 /**
@@ -27,7 +31,7 @@ use RuntimeException;
  *     statements: list<StatementProfilePayload>
  * }
  */
-final class BlockResult
+final class BlockResult implements TotallyOrdered
 {
     public function __construct(
         public readonly int $blockIndex,
@@ -38,6 +42,18 @@ final class BlockResult
         public readonly SampleCollection $wallSamples,
         public readonly StatementProfileCollection $statements,
     ) {}
+
+    /**
+     * Blocks are ordered by their position in the session schedule.
+     */
+    public function compareTo(Ordered $other): Ordering
+    {
+        if (!$other instanceof self) {
+            throw new LogicException(sprintf('%s is only ordered against its own kind, not %s.', self::class, $other::class));
+        }
+
+        return Ordering::between(left: $this->executionOrder, right: $other->executionOrder);
+    }
 
     /**
      * One wall sample is recorded per measured iteration, so the sample count
@@ -74,7 +90,7 @@ final class BlockResult
         $resultSetConsistent = $payload['resultSetConsistent'] ?? null;
         $wallSamples = $payload['wallNsSamples'] ?? null;
         $statements = $payload['statements'] ?? null;
-        if (!is_int($blockIndex) || !is_int($executionOrder) || !is_int($warmupIterations) || !is_array($resultSet) || !is_bool($resultSetConsistent) || !is_array($statements)) {
+        if (!is_int($blockIndex) || !is_int($executionOrder) || !is_int($warmupIterations) || !is_array($resultSet) || !is_bool($resultSetConsistent) || !is_array($wallSamples) || !is_array($statements)) {
             throw new RuntimeException('Malformed block result payload.');
         }
 
@@ -84,7 +100,7 @@ final class BlockResult
             warmupIterations: $warmupIterations,
             resultSet: ResultSet::fromDecodedArray($resultSet),
             resultSetConsistent: $resultSetConsistent,
-            wallSamples: SampleCollection::fromDecodedArray(payload: $wallSamples, context: 'block wall samples'),
+            wallSamples: SampleCollection::fromDecodedArray($wallSamples),
             statements: StatementProfileCollection::fromDecodedArray($statements),
         );
     }

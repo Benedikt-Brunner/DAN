@@ -11,7 +11,9 @@
             "src/Comparison",
             "src/Measurement",
             "src/Protocol",
-            "src/RunStore"
+            "src/RunStore",
+            // The sequence diff the statement alignment is built on.
+            "lib/src/Sequence"
         ],
         "excludes": [
             // Boundary: drives containers and probe processes per grid cell.
