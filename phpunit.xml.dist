@@ -13,6 +13,7 @@
     <source>
         <include>
             <directory>src</directory>
+            <directory>lib/src</directory>
         </include>
     </source>
 </phpunit>
