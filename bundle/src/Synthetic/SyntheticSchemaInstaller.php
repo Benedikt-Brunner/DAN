@@ -17,9 +17,9 @@ use Doctrine\DBAL\Connection;
  */
 final readonly class SyntheticSchemaInstaller
 {
-    public function __construct(private Connection $connection) {}
-
     private const TABLE = 'dan_synthetic_blob';
+
+    public function __construct(private Connection $connection) {}
 
     public function install(): void
     {
