@@ -6,6 +6,7 @@ namespace Dan\Harness\Tests\Gate;
 
 use Dan\Harness\Comparison\AlignedStatement;
 use Dan\Harness\Comparison\AlignmentKind;
+use Dan\Harness\Comparison\BlockComparisonCollection;
 use Dan\Harness\Comparison\CellComparison;
 use Dan\Harness\Comparison\ResultSetComparison;
 use Dan\Harness\Comparison\StatementAlignment;
@@ -155,7 +156,7 @@ final class PolicyTest extends TestCase
             candidateP95Wall: Duration::fromNs(12_000_000),
             wallShift: $shift,
             unstableStatements: [],
-            blocks: [],
+            blocks: BlockComparisonCollection::create([]),
         );
     }
 }

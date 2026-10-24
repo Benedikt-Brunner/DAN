@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Dan\Harness\Comparison;
 
+use Dan\Lib\Sequence\LongestCommonSubsequence;
+use Dan\Lib\Sequence\MatchedPosition;
+
 /**
  * Aligns two statement sequences by their normalized SQL fingerprints with
  * an order-preserving sequence diff (longest common subsequence). Removing or
@@ -26,7 +29,8 @@ final class StatementAligner
      */
     public static function align(array $baseline, array $candidate): StatementAlignment
     {
-        $matches = self::longestCommonSubsequence(baseline: $baseline, candidate: $candidate);
+        // Left is the baseline, right the candidate.
+        $matches = LongestCommonSubsequence::of(left: $baseline, right: $candidate);
 
         $items = [];
         $baselineCursor = 0;
@@ -39,8 +43,8 @@ final class StatementAligner
             null,
         ];
         foreach ($anchors as $match) {
-            $baselineEnd = $match === null ? count($baseline) : $match[0];
-            $candidateEnd = $match === null ? count($candidate) : $match[1];
+            $baselineEnd = $match === null ? count($baseline) : $match->leftIndex;
+            $candidateEnd = $match === null ? count($candidate) : $match->rightIndex;
             $items = [
                 ...$items,
                 ...self::classifyGap(
@@ -53,9 +57,9 @@ final class StatementAligner
                 ),
             ];
             if ($match !== null) {
-                $items[] = new AlignedStatement(kind: AlignmentKind::Unchanged, baselineIndex: $match[0], candidateIndex: $match[1]);
-                $baselineCursor = $match[0] + 1;
-                $candidateCursor = $match[1] + 1;
+                $items[] = new AlignedStatement(kind: AlignmentKind::Unchanged, baselineIndex: $match->leftIndex, candidateIndex: $match->rightIndex);
+                $baselineCursor = $match->leftIndex + 1;
+                $candidateCursor = $match->rightIndex + 1;
                 $previousMatch = $match;
             }
         }
@@ -74,61 +78,10 @@ final class StatementAligner
     /**
      * @param list<string> $baseline
      * @param list<string> $candidate
-     *
-     * @return list<array{int, int}> matched (baseline, candidate) index pairs in order
-     */
-    private static function longestCommonSubsequence(array $baseline, array $candidate): array
-    {
-        $baselineCount = count($baseline);
-        $candidateCount = count($candidate);
-        // lengths[i][j] = LCS length of baseline[i..] and candidate[j..].
-        $lengths = array_fill(0, $baselineCount + 1, array_fill(0, $candidateCount + 1, 0));
-        for ($i = $baselineCount - 1; $i >= 0; --$i) {
-            for ($j = $candidateCount - 1; $j >= 0; --$j) {
-                $lengths[$i][$j] = $baseline[$i] === $candidate[$j]
-                    ? $lengths[$i + 1][$j + 1] + 1
-                    : max($lengths[$i + 1][$j], $lengths[$i][$j + 1]);
-            }
-        }
-
-        // Backtrack from the front. Among equally long common subsequences
-        // prefer the one that keeps the two cursors side by side: when
-        // leaving both current statements unmatched still yields an optimal
-        // subsequence, they are a substitution pair, not a removal here and
-        // an insertion somewhere further down. Without this rule a repeated
-        // statement after a change lets the match drift onto the wrong copy
-        // and a substituted position would read as unchanged.
-        $matches = [];
-        $i = 0;
-        $j = 0;
-        while ($i < $baselineCount && $j < $candidateCount) {
-            if ($baseline[$i] === $candidate[$j]) {
-                $matches[] = [
-                    $i,
-                    $j,
-                ];
-                ++$i;
-                ++$j;
-            } elseif ($lengths[$i + 1][$j + 1] === $lengths[$i][$j]) {
-                ++$i;
-                ++$j;
-            } elseif ($lengths[$i + 1][$j] >= $lengths[$i][$j + 1]) {
-                ++$i;
-            } else {
-                ++$j;
-            }
-        }
-
-        return $matches;
-    }
-
-    /**
-     * @param list<string> $baseline
-     * @param list<string> $candidate
      * @param list<int> $baselineGap unmatched baseline positions between two anchors
      * @param list<int> $candidateGap unmatched candidate positions between the same anchors
-     * @param array{int, int}|null $previousMatch
-     * @param array{int, int}|null $nextMatch
+     * @param MatchedPosition|null $previousMatch the anchor before the gap, null at the start of both sequences
+     * @param MatchedPosition|null $nextMatch the anchor after the gap, null at the end of both sequences
      *
      * @return list<AlignedStatement>
      */
@@ -137,41 +90,43 @@ final class StatementAligner
         array $candidate,
         array $baselineGap,
         array $candidateGap,
-        ?array $previousMatch,
-        ?array $nextMatch,
+        ?MatchedPosition $previousMatch,
+        ?MatchedPosition $nextMatch,
     ): array {
         $baselineAnchors = array_values(array_filter([
-            $previousMatch === null ? null : $baseline[$previousMatch[0]],
-            $nextMatch === null ? null : $baseline[$nextMatch[0]],
+            $previousMatch === null ? null : $baseline[$previousMatch->leftIndex],
+            $nextMatch === null ? null : $baseline[$nextMatch->leftIndex],
         ], is_string(...)));
         $candidateAnchors = array_values(array_filter([
-            $previousMatch === null ? null : $candidate[$previousMatch[1]],
-            $nextMatch === null ? null : $candidate[$nextMatch[1]],
+            $previousMatch === null ? null : $candidate[$previousMatch->rightIndex],
+            $nextMatch === null ? null : $candidate[$nextMatch->rightIndex],
         ], is_string(...)));
 
         $items = [];
-        $pairs = min(count($baselineGap), count($candidateGap));
-        for ($k = 0; $k < $pairs; ++$k) {
-            $ambiguous = in_array($baseline[$baselineGap[$k]], $baselineAnchors, true)
-                || in_array($candidate[$candidateGap[$k]], $candidateAnchors, true);
+        $pairCount = min(count($baselineGap), count($candidateGap));
+        for ($gapOffset = 0; $gapOffset < $pairCount; ++$gapOffset) {
+            $baselineIndex = $baselineGap[$gapOffset];
+            $candidateIndex = $candidateGap[$gapOffset];
+            $ambiguous = in_array($baseline[$baselineIndex], $baselineAnchors, true)
+                || in_array($candidate[$candidateIndex], $candidateAnchors, true);
             $items[] = new AlignedStatement(
                 kind: $ambiguous ? AlignmentKind::Ambiguous : AlignmentKind::Modified,
-                baselineIndex: $baselineGap[$k],
-                candidateIndex: $candidateGap[$k],
+                baselineIndex: $baselineIndex,
+                candidateIndex: $candidateIndex,
             );
         }
-        foreach (array_slice($baselineGap, $pairs) as $index) {
+        foreach (array_slice($baselineGap, $pairCount) as $baselineIndex) {
             $items[] = new AlignedStatement(
-                kind: in_array($baseline[$index], $baselineAnchors, true) ? AlignmentKind::Ambiguous : AlignmentKind::Removed,
-                baselineIndex: $index,
+                kind: in_array($baseline[$baselineIndex], $baselineAnchors, true) ? AlignmentKind::Ambiguous : AlignmentKind::Removed,
+                baselineIndex: $baselineIndex,
                 candidateIndex: null,
             );
         }
-        foreach (array_slice($candidateGap, $pairs) as $index) {
+        foreach (array_slice($candidateGap, $pairCount) as $candidateIndex) {
             $items[] = new AlignedStatement(
-                kind: in_array($candidate[$index], $candidateAnchors, true) ? AlignmentKind::Ambiguous : AlignmentKind::Inserted,
+                kind: in_array($candidate[$candidateIndex], $candidateAnchors, true) ? AlignmentKind::Ambiguous : AlignmentKind::Inserted,
                 baselineIndex: null,
-                candidateIndex: $index,
+                candidateIndex: $candidateIndex,
             );
         }
 

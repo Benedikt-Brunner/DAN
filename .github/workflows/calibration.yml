@@ -22,12 +22,36 @@ env:
 
 jobs:
   a-a:
-    name: A/A run (false-positive check)
+    # Runs once per published-port forwarding mode. With the daemon default
+    # every database round trip crosses the userland docker-proxy process,
+    # which adds a fixed offset and scheduling jitter per statement (and a
+    # fixed additive offset compresses relative regressions). With the proxy
+    # disabled Docker forwards loopback traffic in the kernel via iptables and
+    # route_localnet. Recording both on the same runner class is what lets the
+    # calibration history say which mode the default configuration should
+    # adopt; the run manifest records the mode in effect.
+    name: A/A run (false-positive check, userland proxy ${{ matrix.userland-proxy }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        userland-proxy: [true, false]
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Forward published ports in the kernel instead of docker-proxy
+        if: ${{ matrix.userland-proxy == false }}
+        run: |
+          sudo mkdir -p /etc/docker
+          if [ -s /etc/docker/daemon.json ]; then
+            jq '. + {"userland-proxy": false}' /etc/docker/daemon.json | sudo tee /etc/docker/daemon.json.dan > /dev/null
+            sudo mv /etc/docker/daemon.json.dan /etc/docker/daemon.json
+          else
+            echo '{"userland-proxy": false}' | sudo tee /etc/docker/daemon.json > /dev/null
+          fi
+          sudo systemctl restart docker
+          docker info --format 'Firewall backend: {{json .FirewallBackend}}'
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
@@ -46,7 +70,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: calibration-aa-${{ github.run_id }}
+          name: calibration-aa-userland-proxy-${{ matrix.userland-proxy }}-${{ github.run_id }}
           path: runs/
           retention-days: 90
 
