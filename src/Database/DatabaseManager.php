@@ -9,11 +9,19 @@ use Dan\Lib\Filesystem\Path;
 
 interface DatabaseManager
 {
-    public function start(DatabaseTarget $target, string $containerName): DatabaseInstance;
+    /**
+     * Starts an isolated database: empty, or restored from a data-directory
+     * snapshot taken by snapshot(). A restored server starts with a cold
+     * buffer pool - the per-cell warmup exists to bring it up to temperature.
+     */
+    public function start(DatabaseTarget $target, string $containerName, ?Path $snapshot = null): DatabaseInstance;
 
     public function stop(DatabaseInstance $instance): void;
 
-    public function importDump(DatabaseInstance $instance, Path $dumpPath): void;
-
-    public function dumpTo(DatabaseInstance $instance, Path $dumpPath): void;
+    /**
+     * Cleanly shuts the server down, archives its data directory into the
+     * snapshot file and brings the same instance back up. Restoring the
+     * archive costs a copy, not an index rebuild.
+     */
+    public function snapshot(DatabaseInstance $instance, Path $snapshot): void;
 }

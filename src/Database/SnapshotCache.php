@@ -15,6 +15,11 @@ use RuntimeException;
  * slow (hours for the L tier), thus grid cells load snapshots, seeding happens at most
  * once per (implementation identity x tier x engine x seeder version).
  *
+ * A snapshot is an archive of the server's data directory (see
+ * DatabaseManager::snapshot()), which is why the key includes the engine and
+ * its version: a data directory is only ever restored into the server that
+ * wrote it.
+ *
  * Bump SEEDER_VERSION whenever the deterministic seeder's output changes -
  * it invalidates every cached snapshot.
  */
@@ -49,6 +54,6 @@ final class SnapshotCache
             throw new RuntimeException(sprintf('Could not create snapshot cache directory "%s".', $this->directory->toString()));
         }
 
-        return $this->directory->join($key . '.sql');
+        return $this->directory->join($key . '.tar.gz');
     }
 }

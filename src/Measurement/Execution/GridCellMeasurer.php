@@ -20,8 +20,9 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 /**
  * Measures one grid cell (tier x database) for every implementation in the
- * session: starts one isolated database container per implementation, loads
- * or seeds the dataset snapshot, executes the scheduled measurement blocks
+ * session: starts one isolated database container per implementation,
+ * restored from the cached data-directory snapshot or freshly seeded (and
+ * then snapshotted), executes the scheduled measurement blocks
  * through each runtime's dan:execute, and merges the per-block scenario results
  * into the run's cell artifacts.
  */
@@ -59,21 +60,22 @@ final class GridCellMeasurer
             foreach ($runs as $run) {
                 $slot = $run->slot->value;
                 $containerName = sprintf('dan-%s-%s-%s', $slot, $tier->value, preg_replace('/[^a-z0-9]+/', '', $database->id()));
-                $instances[$slot] = $this->databaseManager->start(target: $database, containerName: $containerName);
 
                 $snapshotKey = $this->cache->key(identity: $run->identity, tier: $tier, database: $database);
+                $snapshotPath = $this->cache->path($snapshotKey);
                 if ($this->cache->has($snapshotKey)) {
-                    $this->output->writeln(sprintf('  [%s] Loading cached snapshot %s', $slot, $snapshotKey));
-                    $this->databaseManager->importDump(instance: $instances[$slot], dumpPath: $this->cache->path($snapshotKey));
+                    $this->output->writeln(sprintf('  [%s] Restoring cached snapshot %s', $slot, $snapshotKey));
+                    $instances[$slot] = $this->databaseManager->start(target: $database, containerName: $containerName, snapshot: $snapshotPath);
                 } else {
                     $this->output->writeln(sprintf('  [%s] Snapshot cache miss - installing and seeding tier %s (this can take a while)', $slot, $tier->value));
+                    $instances[$slot] = $this->databaseManager->start(target: $database, containerName: $containerName);
                     $run->runtime->installShopware($instances[$slot]);
                     $run->runtime->run(args: [
                         'dan:seed',
                         '--tier',
                         $tier->value,
                     ], database: $instances[$slot]);
-                    $this->databaseManager->dumpTo(instance: $instances[$slot], dumpPath: $this->cache->path($snapshotKey));
+                    $this->databaseManager->snapshot(instance: $instances[$slot], snapshot: $snapshotPath);
                 }
             }
 
