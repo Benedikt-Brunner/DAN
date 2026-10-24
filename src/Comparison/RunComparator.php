@@ -4,18 +4,20 @@ declare(strict_types=1);
 
 namespace Dan\Harness\Comparison;
 
+use Dan\Harness\Measurement\Result\LatencyDelta;
+use Dan\Harness\Measurement\Result\MedianShift;
 use Dan\Harness\Measurement\Result\MedianShiftEstimator;
 use Dan\Harness\Measurement\Result\SampleCollection;
 use Dan\Harness\Measurement\Result\SamplePair;
 use Dan\Harness\Measurement\Result\Statistics;
 use Dan\Harness\Measurement\Scheduling\RunSlot;
 use Dan\Harness\Protocol\Engine;
-use Dan\Harness\RunStore\Artifact\BlockResult;
 use Dan\Harness\RunStore\Artifact\BlockResultCollection;
 use Dan\Harness\RunStore\Artifact\CellResult;
 use Dan\Harness\RunStore\Artifact\StatementProfile;
 use Dan\Harness\RunStore\Artifact\StatementProfileCollection;
 use Dan\Harness\RunStore\Filesystem\RunDirectory;
+use Dan\Lib\Order\Sort;
 
 final class RunComparator
 {
@@ -117,7 +119,12 @@ final class RunComparator
             candidateMedianWall: $candidateWallStatistics->median(),
             baselineP95Wall: $baselineWallStatistics->percentile(Statistics::P95),
             candidateP95Wall: $candidateWallStatistics->percentile(Statistics::P95),
-            wallShift: $shiftEstimator->estimate(self::samplePairs(blocks: $blocks, baseline: $baselineWall, candidate: $candidateWall)),
+            wallShift: self::wallShift(
+                blocks: $blocks,
+                baseline: $baselineWall,
+                candidate: $candidateWall,
+                shiftEstimator: $shiftEstimator,
+            ),
             unstableStatements: $unstableStatements,
             planChanges: self::planChanges(
                 alignment: $alignment,
@@ -174,44 +181,48 @@ final class RunComparator
     }
 
     /**
-     * The units the shift estimate resamples within: the paired blocks when
-     * both runs recorded them, otherwise (an interrupted run) the pooled
-     * samples as one pair.
-     *
-     * @param list<BlockComparison> $blocks
-     *
-     * @return list<SamplePair>
+     * The shift estimate resamples within mirrored block pairs, so its
+     * interval reflects the session's block design. That needs the pairs to
+     * cover every recorded sample: an interrupted run leaves blocks without a
+     * partner, and neither the matched blocks alone (different samples than
+     * the reported medians) nor the pool (iterations treated as independent
+     * draws, understating drift) yields an honest interval. Such a cell keeps
+     * the pooled point estimate - the shift between the reported medians -
+     * without an interval, so it cannot gate.
      */
-    private static function samplePairs(array $blocks, SampleCollection $baseline, SampleCollection $candidate): array
-    {
-        if ($blocks === []) {
-            return [new SamplePair(baseline: $baseline, candidate: $candidate)];
+    private static function wallShift(
+        BlockComparisonCollection $blocks,
+        SampleCollection $baseline,
+        SampleCollection $candidate,
+        MedianShiftEstimator $shiftEstimator,
+    ): MedianShift {
+        $pairs = array_map(
+            fn (BlockComparison $block): SamplePair => new SamplePair(baseline: $block->baselineSamples, candidate: $block->candidateSamples),
+            $blocks->getItems(),
+        );
+        $pairedBaseline = array_sum(array_map(fn (SamplePair $pair): int => count($pair->baseline), $pairs));
+        $pairedCandidate = array_sum(array_map(fn (SamplePair $pair): int => count($pair->candidate), $pairs));
+        if ($pairs === [] || $pairedBaseline !== count($baseline) || $pairedCandidate !== count($candidate)) {
+            return MedianShift::withoutInterval(
+                estimatePct: LatencyDelta::percent(baseline: Statistics::create($baseline)->median(), candidate: Statistics::create($candidate)->median()),
+                confidence: MedianShiftEstimator::CONFIDENCE,
+            );
         }
 
-        return array_map(
-            fn (BlockComparison $block): SamplePair => new SamplePair(baseline: $block->baselineSamples, candidate: $block->candidateSamples),
-            $blocks,
-        );
+        return $shiftEstimator->estimate($pairs);
     }
 
     /**
      * Pairs the two runs' blocks by block index. A block index present on one
      * side only (an interrupted run) has no pair and is left out - the pooled
      * numbers still cover its samples.
-     *
-     * @return list<BlockComparison>
      */
-    private static function compareBlocks(BlockResultCollection $baseline, BlockResultCollection $candidate): array
+    private static function compareBlocks(BlockResultCollection $baseline, BlockResultCollection $candidate): BlockComparisonCollection
     {
-        $candidateByIndex = [];
-        foreach ($candidate as $block) {
-            $candidateByIndex[$block->blockIndex] = $block;
-        }
-
         $pairs = [];
         foreach ($baseline as $baselineBlock) {
-            $candidateBlock = $candidateByIndex[$baselineBlock->blockIndex] ?? null;
-            if (!$candidateBlock instanceof BlockResult || $baselineBlock->wallSamples->empty() || $candidateBlock->wallSamples->empty()) {
+            $candidateBlock = $candidate->findByBlockIndex($baselineBlock->blockIndex);
+            if ($candidateBlock === null || $baselineBlock->wallSamples->empty() || $candidateBlock->wallSamples->empty()) {
                 continue;
             }
             $pairs[] = new BlockComparison(
@@ -222,8 +233,7 @@ final class RunComparator
                 candidateSamples: $candidateBlock->wallSamples,
             );
         }
-        usort($pairs, fn (BlockComparison $a, BlockComparison $b): int => $a->blockIndex <=> $b->blockIndex);
 
-        return $pairs;
+        return BlockComparisonCollection::create(Sort::ascending($pairs));
     }
 }
