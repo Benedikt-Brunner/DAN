@@ -71,16 +71,20 @@ final class RunManifest
     public static function fromDecodedArray(array $payload): self
     {
         $schemaVersion = $payload['schemaVersion'] ?? null;
+        if (!is_int($schemaVersion)) {
+            throw new RuntimeException('Malformed run-manifest payload.');
+        }
+        if ($schemaVersion !== self::SCHEMA_VERSION) {
+            throw new RuntimeException(sprintf('Unsupported run-manifest schema version %d (expected %d).', $schemaVersion, self::SCHEMA_VERSION));
+        }
+
         $runId = $payload['runId'] ?? null;
         $createdAt = $payload['createdAt'] ?? null;
         $implementation = $payload['implementation'] ?? null;
         $protocol = $payload['protocol'] ?? null;
         $environment = $payload['environment'] ?? null;
-        if (!is_int($schemaVersion) || !is_string($runId) || !is_string($createdAt) || !is_array($implementation) || !is_array($protocol) || !is_array($environment)) {
+        if (!is_string($runId) || !is_string($createdAt) || !is_array($implementation) || !is_array($protocol) || !is_array($environment)) {
             throw new RuntimeException('Malformed run-manifest payload.');
-        }
-        if ($schemaVersion !== self::SCHEMA_VERSION) {
-            throw new RuntimeException(sprintf('Unsupported run-manifest schema version %d (expected %d).', $schemaVersion, self::SCHEMA_VERSION));
         }
 
         $reference = $implementation['reference'] ?? null;
