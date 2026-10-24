@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Dan\Harness\Protocol;
 
+use Dan\Lib\Collections\Set;
 use Dan\Lib\Protocol\Tier;
 use InvalidArgumentException;
 
@@ -29,7 +30,7 @@ final class ProtocolResolver
             throw new InvalidArgumentException('At least one --tier is required (S, M or L).');
         }
         $resolvedTiers = [];
-        foreach (array_values(array_unique($tiers)) as $tier) {
+        foreach (Set::create($tiers) as $tier) {
             $resolvedTiers[] = Tier::tryFrom($tier) ?? throw new InvalidArgumentException(sprintf('Unknown tier "%s", expected one of: %s.', $tier, implode(', ', array_map(fn (Tier $t) => $t->value, Tier::cases()))));
         }
         if ($measuredIterations < 1) {

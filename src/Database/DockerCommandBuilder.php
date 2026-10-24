@@ -12,6 +12,9 @@ use InvalidArgumentException;
 
 final class DockerCommandBuilder
 {
+    private const string DATA_DIRECTORY = '/var/lib/mysql';
+    private const string SNAPSHOT_MOUNT = '/snapshot';
+
     /**
      * @param non-empty-list<string> $arguments
      */
@@ -21,9 +24,6 @@ final class DockerCommandBuilder
         private readonly ?Path $outputPath = null,
         private ?Duration $timeout = null,
     ) {}
-
-    private const string DATA_DIRECTORY = '/var/lib/mysql';
-    private const string SNAPSHOT_MOUNT = '/snapshot';
 
     /**
      * Starts the server with its data directory on the instance's named
