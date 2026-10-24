@@ -94,7 +94,11 @@ final class EnvironmentResolverTest extends TestCase
         self::assertFalse($environment->dockerEngine->userlandProxy);
         self::assertSame('sha256:7dcddc01f13bab2f15cde676d44d01f61fc9f99fe7785e86196dfc07d358ae2b', $environment->databaseImages[0]->digest);
         self::assertSame('published-port', $environment->databaseNetworkPath->value);
-        self::assertNotContains('docker pull', array_map(self::describe(...), $runner->commands), 'A present image is never pulled again.');
+        $pulls = array_filter(
+            array_map(self::describe(...), $runner->commands),
+            fn (string $command): bool => str_starts_with($command, 'docker pull'),
+        );
+        self::assertSame([], array_values($pulls), 'A present image is never pulled again.');
     }
 
     public function testRecordsExplicitUnknownsWhenNothingCanBeDiscovered(): void
