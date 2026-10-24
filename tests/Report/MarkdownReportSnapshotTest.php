@@ -13,6 +13,11 @@ use Dan\Harness\Comparison\ResultSetComparison;
 use Dan\Harness\Comparison\RunComparison;
 use Dan\Harness\Comparison\StatementAlignment;
 use Dan\Harness\Comparison\StatementInstability;
+use Dan\Harness\Environment\DatabaseImage;
+use Dan\Harness\Environment\DatabaseNetworkPath;
+use Dan\Harness\Environment\DockerEngine;
+use Dan\Harness\Environment\ExecutionEnvironment;
+use Dan\Harness\Environment\HostMachine;
 use Dan\Harness\Gate\Policy;
 use Dan\Harness\Gate\Violation;
 use Dan\Harness\Implementation\Identity\Identity;
@@ -191,6 +196,7 @@ final class MarkdownReportSnapshotTest extends TestCase
                     baselineManifest: self::manifest(id: 'baseline-aaaaaaaa', label: 'v6.6.10.22', recordedAt: '2026-08-20 10:00:00', protocol: $protocol),
                     candidateManifest: self::manifest(id: 'candidate-aaaaaaa', label: 'v6.6.10.22', recordedAt: '2026-08-20 10:20:00', protocol: $protocol),
                     protocolsMatch: true,
+                    environmentsComparable: true,
                     cells: $cleanCells,
                     cellsOnlyInBaseline: [],
                     cellsOnlyInCandidate: [],
@@ -203,6 +209,7 @@ final class MarkdownReportSnapshotTest extends TestCase
                     baselineManifest: self::manifest(id: 'baseline-bbbbbbbb', label: 'v6.6.10.22', recordedAt: '2026-08-20 10:00:00', protocol: $protocol),
                     candidateManifest: self::manifest(id: 'candidate-bbbbbbb', label: 'local checkout', recordedAt: '2026-08-20 10:20:00', protocol: $protocol),
                     protocolsMatch: true,
+                    environmentsComparable: true,
                     cells: $sqlChangeCells,
                     cellsOnlyInBaseline: [],
                     cellsOnlyInCandidate: [],
@@ -215,6 +222,7 @@ final class MarkdownReportSnapshotTest extends TestCase
                     baselineManifest: self::manifest(id: 'baseline-cccccccc', label: 'v6.6.10.22', recordedAt: '2026-08-20 10:00:00', protocol: $protocol),
                     candidateManifest: self::manifest(id: 'candidate-ccccccc', label: 'local checkout', recordedAt: '2026-08-20 10:20:00', protocol: $protocol),
                     protocolsMatch: true,
+                    environmentsComparable: true,
                     cells: $regressionCells,
                     cellsOnlyInBaseline: [],
                     cellsOnlyInCandidate: [],
@@ -225,8 +233,9 @@ final class MarkdownReportSnapshotTest extends TestCase
             'protocol-mismatch' => [
                 'comparison' => new RunComparison(
                     baselineManifest: self::manifest(id: 'baseline-dddddddd', label: 'v6.6.10.22', recordedAt: '2026-08-20 10:00:00', protocol: $protocol),
-                    candidateManifest: self::manifest(id: 'candidate-ddddddd', label: 'v6.7.0.0', recordedAt: '2026-08-21 09:00:00', protocol: self::protocol(measuredIterations: 60)),
+                    candidateManifest: self::manifest(id: 'candidate-ddddddd', label: 'v6.7.0.0', recordedAt: '2026-08-21 09:00:00', protocol: self::protocol(measuredIterations: 60), environment: self::environment(danRevision: str_repeat('e', 64), digest: null, dockerEngine: null)),
                     protocolsMatch: false,
+                    environmentsComparable: false,
                     cells: [],
                     cellsOnlyInBaseline: ['product.deep-read--S--mysql-8.0.json'],
                     cellsOnlyInCandidate: ['order.aggregation--S--mysql-8.0.json'],
@@ -279,7 +288,7 @@ final class MarkdownReportSnapshotTest extends TestCase
         return new StatementAlignment($items);
     }
 
-    private static function manifest(string $id, string $label, string $recordedAt, Protocol $protocol): RunManifest
+    private static function manifest(string $id, string $label, string $recordedAt, Protocol $protocol, ?ExecutionEnvironment $environment = null): RunManifest
     {
         return new RunManifest(
             runId: $id,
@@ -288,6 +297,27 @@ final class MarkdownReportSnapshotTest extends TestCase
             implementationReference: $label,
             implementationIdentity: new Identity(id: $id, label: $label),
             protocol: $protocol,
+            environment: $environment ?? self::environment(),
+        );
+    }
+
+    /**
+     * A GitHub-hosted runner as the calibration workflow sees it; nulls
+     * stand in for facts the platform did not expose.
+     */
+    private static function environment(
+        string $danRevision = 'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',
+        ?string $digest = 'sha256:7dcddc01f13bab2f15cde676d44d01f61fc9f99fe7785e86196dfc07d358ae2b',
+        ?DockerEngine $dockerEngine = new DockerEngine(version: '29.5.2', operatingSystem: 'Ubuntu 24.04.4 LTS', architecture: 'x86_64', cpus: 4, memoryBytes: 16_775_622_656, userlandProxy: false),
+    ): ExecutionEnvironment {
+        return new ExecutionEnvironment(
+            danRevision: $danRevision,
+            phpVersion: '8.4.24',
+            composerVersion: '2.10.3',
+            host: new HostMachine(operatingSystem: 'Linux 6.8.0-1021-azure', architecture: 'x86_64', cpuModel: 'AMD EPYC 7763 64-Core Processor', cpuLimit: null, memoryLimitBytes: null),
+            dockerEngine: $dockerEngine,
+            databaseImages: [new DatabaseImage(target: new DatabaseTarget(engine: Engine::MySql, version: '8.0'), digest: $digest)],
+            databaseNetworkPath: DatabaseNetworkPath::PublishedPort,
         );
     }
 

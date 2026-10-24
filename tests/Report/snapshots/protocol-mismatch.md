@@ -9,6 +9,9 @@
 > [!WARNING]
 > The two runs were recorded under **different protocols**. Latency comparisons below are not meaningful.
 
+> [!WARNING]
+> The two runs were recorded by **different DAN revisions or database images** (see Reproducibility). SQL comparisons may reflect the tooling or the image rather than the implementation.
+
 Protocol: 5 warmup + 30 measured iterations in 4 blocks, 2 warmup at the start of every block.
 
 Gate: a cell fails when its estimated median shift exceeds +10.0% and its 95% interval excludes zero; SQL changes fail.
@@ -16,3 +19,18 @@ Gate: a cell fails when its estimated median shift exceeds +10.0% and its 95% in
 Cells only present in the baseline run: `product.deep-read--S--mysql-8.0.json`
 
 Cells only present in the candidate run: `order.aggregation--S--mysql-8.0.json`
+
+## Reproducibility
+
+| | Baseline | Candidate |
+|---|---|---|
+| DAN revision | `dddddddddddd` | `eeeeeeeeeeee` |
+| PHP | 8.4.24 | 8.4.24 |
+| Composer | 2.10.3 | 2.10.3 |
+| Host | Linux 6.8.0-1021-azure, x86_64 | Linux 6.8.0-1021-azure, x86_64 |
+| Host CPU | AMD EPYC 7763 64-Core Processor | AMD EPYC 7763 64-Core Processor |
+| Host CPU limit | unknown | unknown |
+| Host memory limit | unknown | unknown |
+| Docker engine | 29.5.2 on Ubuntu 24.04.4 LTS, x86_64, 4 CPUs, 15.6 GiB | unknown |
+| Database network path | published-port (kernel NAT, userland proxy disabled) | published-port |
+| Database images | mysql-8.0 @ `sha256:7dcddc01f13b` | mysql-8.0 @ unknown digest |

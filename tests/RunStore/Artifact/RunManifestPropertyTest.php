@@ -133,6 +133,75 @@ final class RunManifestPropertyTest extends PropertyTestCase
                 ],
                 'many',
             ],
+            [
+                ['environment'],
+                'env',
+            ],
+            [
+                [
+                    'environment',
+                    'danRevision',
+                ],
+                42,
+            ],
+            [
+                [
+                    'environment',
+                    'phpVersion',
+                ],
+                8.4,
+            ],
+            [
+                [
+                    'environment',
+                    'composerVersion',
+                ],
+                2,
+            ],
+            [
+                [
+                    'environment',
+                    'host',
+                ],
+                'linux',
+            ],
+            [
+                [
+                    'environment',
+                    'host',
+                    'architecture',
+                ],
+                64,
+            ],
+            [
+                [
+                    'environment',
+                    'host',
+                    'memoryLimitBytes',
+                ],
+                '8G',
+            ],
+            [
+                [
+                    'environment',
+                    'dockerEngine',
+                ],
+                '29.5.2',
+            ],
+            [
+                [
+                    'environment',
+                    'databaseImages',
+                ],
+                'mysql:8.0',
+            ],
+            [
+                [
+                    'environment',
+                    'databaseNetworkPath',
+                ],
+                'carrier-pigeon',
+            ],
         ];
 
         $this->forAll(

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Dan\Harness\RunStore\Artifact;
 
+use Dan\Harness\Environment\ExecutionEnvironment;
 use Dan\Harness\Implementation\Identity\Identity;
 use Dan\Harness\Implementation\Reference\ReferenceType;
 use Dan\Harness\Protocol\Protocol;
@@ -14,6 +15,7 @@ use RuntimeException;
 /**
  * @phpstan-import-type IdentityPayload from Identity
  * @phpstan-import-type ProtocolPayload from Protocol
+ * @phpstan-import-type ExecutionEnvironmentPayload from ExecutionEnvironment
  *
  * @phpstan-type RunManifestPayload array{
  *     schemaVersion: int,
@@ -26,7 +28,8 @@ use RuntimeException;
  *         },
  *         identity: IdentityPayload
  *     },
- *     protocol: ProtocolPayload
+ *     protocol: ProtocolPayload,
+ *     environment: ExecutionEnvironmentPayload
  * }
  */
 final class RunManifest
@@ -40,6 +43,7 @@ final class RunManifest
         public readonly string $implementationReference,
         public readonly Identity $implementationIdentity,
         public readonly Protocol $protocol,
+        public readonly ExecutionEnvironment $environment,
     ) {}
 
     /** @return RunManifestPayload */
@@ -57,6 +61,7 @@ final class RunManifest
                 'identity' => $this->implementationIdentity->toArray(),
             ],
             'protocol' => $this->protocol->toArray(),
+            'environment' => $this->environment->toArray(),
         ];
     }
 
@@ -66,15 +71,20 @@ final class RunManifest
     public static function fromDecodedArray(array $payload): self
     {
         $schemaVersion = $payload['schemaVersion'] ?? null;
-        $runId = $payload['runId'] ?? null;
-        $createdAt = $payload['createdAt'] ?? null;
-        $implementation = $payload['implementation'] ?? null;
-        $protocol = $payload['protocol'] ?? null;
-        if (!is_int($schemaVersion) || !is_string($runId) || !is_string($createdAt) || !is_array($implementation) || !is_array($protocol)) {
+        if (!is_int($schemaVersion)) {
             throw new RuntimeException('Malformed run-manifest payload.');
         }
         if ($schemaVersion !== self::SCHEMA_VERSION) {
             throw new RuntimeException(sprintf('Unsupported run-manifest schema version %d (expected %d).', $schemaVersion, self::SCHEMA_VERSION));
+        }
+
+        $runId = $payload['runId'] ?? null;
+        $createdAt = $payload['createdAt'] ?? null;
+        $implementation = $payload['implementation'] ?? null;
+        $protocol = $payload['protocol'] ?? null;
+        $environment = $payload['environment'] ?? null;
+        if (!is_string($runId) || !is_string($createdAt) || !is_array($implementation) || !is_array($protocol) || !is_array($environment)) {
+            throw new RuntimeException('Malformed run-manifest payload.');
         }
 
         $reference = $implementation['reference'] ?? null;
@@ -96,6 +106,7 @@ final class RunManifest
             implementationReference: $referenceValue,
             implementationIdentity: Identity::fromDecodedArray($identity),
             protocol: Protocol::fromDecodedArray($protocol),
+            environment: ExecutionEnvironment::fromDecodedArray($environment),
         );
     }
 }

@@ -39,3 +39,18 @@ Median wall time per mirrored block pair. "Order" is which slot ran first within
 | product.keyword-listing / S / mysql-8.0 | 1 | candidate first | 8.20ms | 8.20ms | +0.0% |
 | product.deep-read / M / mariadb-11.4 | 0 | baseline first | 47.30ms | 47.30ms | +0.0% |
 | product.deep-read / M / mariadb-11.4 | 1 | candidate first | 47.30ms | 47.30ms | +0.0% |
+
+## Reproducibility
+
+| | Baseline | Candidate |
+|---|---|---|
+| DAN revision | `dddddddddddd` | `dddddddddddd` |
+| PHP | 8.4.24 | 8.4.24 |
+| Composer | 2.10.3 | 2.10.3 |
+| Host | Linux 6.8.0-1021-azure, x86_64 | Linux 6.8.0-1021-azure, x86_64 |
+| Host CPU | AMD EPYC 7763 64-Core Processor | AMD EPYC 7763 64-Core Processor |
+| Host CPU limit | unknown | unknown |
+| Host memory limit | unknown | unknown |
+| Docker engine | 29.5.2 on Ubuntu 24.04.4 LTS, x86_64, 4 CPUs, 15.6 GiB | 29.5.2 on Ubuntu 24.04.4 LTS, x86_64, 4 CPUs, 15.6 GiB |
+| Database network path | published-port (kernel NAT, userland proxy disabled) | published-port (kernel NAT, userland proxy disabled) |
+| Database images | mysql-8.0 @ `sha256:7dcddc01f13b` | mysql-8.0 @ `sha256:7dcddc01f13b` |
