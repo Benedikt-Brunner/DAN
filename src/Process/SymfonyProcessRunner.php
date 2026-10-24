@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Dan\Harness\Process;
 
 use RuntimeException;
+use Symfony\Component\Process\Exception\ProcessTimedOutException;
 use Symfony\Component\Process\Process;
 
 final class SymfonyProcessRunner implements ProcessRunner
@@ -38,7 +39,11 @@ final class SymfonyProcessRunner implements ProcessRunner
             if ($mustSucceed) {
                 $process->mustRun($this->outputCallback(output: $output, outputListener: $outputListener));
             } else {
-                $process->run($this->outputCallback(output: $output, outputListener: $outputListener));
+                try {
+                    $process->run($this->outputCallback(output: $output, outputListener: $outputListener));
+                } catch (ProcessTimedOutException) {
+                    return false;
+                }
             }
 
             return $process->isSuccessful();

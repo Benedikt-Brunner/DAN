@@ -17,6 +17,7 @@ use Dan\Harness\Protocol\Protocol;
 use Dan\Harness\RunStore\Artifact\RunManifest;
 use DateTimeImmutable;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 
 final class RunManifestTest extends TestCase
 {
@@ -64,5 +65,21 @@ final class RunManifestTest extends TestCase
 
         $decoded = RunManifest::fromDecodedArray($payload);
         self::assertSame($payload, $decoded->toArray());
+    }
+
+    public function testRejectsAnUnsupportedSchemaVersionBeforeItsFields(): void
+    {
+        try {
+            RunManifest::fromDecodedArray([
+                'schemaVersion' => 2,
+                'runId' => 'run-1',
+            ]);
+        } catch (RuntimeException $refusal) {
+            self::assertSame('Unsupported run-manifest schema version 2 (expected 1).', $refusal->getMessage());
+
+            return;
+        }
+
+        self::fail('A manifest of another schema version must be refused.');
     }
 }
