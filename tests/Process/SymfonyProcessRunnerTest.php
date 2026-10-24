@@ -8,6 +8,7 @@ use Dan\Harness\Process\OutputListener;
 use Dan\Harness\Process\ProcessCommand;
 use Dan\Harness\Process\SymfonyProcessRunner;
 use Dan\Lib\Filesystem\Path;
+use Dan\Lib\Time\Duration;
 use PHPUnit\Framework\TestCase;
 
 final class SymfonyProcessRunnerTest extends TestCase
@@ -103,6 +104,20 @@ final class SymfonyProcessRunnerTest extends TestCase
                 'exit(4);',
             ],
             timeout: null,
+        );
+
+        self::assertFalse((new SymfonyProcessRunner())->run($command));
+    }
+
+    public function testRunReportsATimeoutAsAnUnsuccessfulRun(): void
+    {
+        $command = new ProcessCommand(
+            arguments: [
+                \PHP_BINARY,
+                '-r',
+                'sleep(30);',
+            ],
+            timeout: Duration::fromSeconds(0.2),
         );
 
         self::assertFalse((new SymfonyProcessRunner())->run($command));
