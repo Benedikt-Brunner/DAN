@@ -7,6 +7,7 @@ namespace Dan\Harness\Tests\Report;
 use Dan\Harness\Comparison\AlignedStatement;
 use Dan\Harness\Comparison\AlignmentKind;
 use Dan\Harness\Comparison\BlockComparison;
+use Dan\Harness\Comparison\BlockComparisonCollection;
 use Dan\Harness\Comparison\CellComparison;
 use Dan\Harness\Comparison\ResultSetComparison;
 use Dan\Harness\Comparison\RunComparison;
@@ -50,7 +51,7 @@ final class MarkdownReportSnapshotTest extends TestCase
     public function testRenderedReportMatchesSnapshot(string $snapshot): void
     {
         $case = self::comparisonCases()[$snapshot];
-        $rendered = (new MarkdownReportRenderer())->render(comparison: $case['comparison'], violations: $case['violations']);
+        $rendered = (new MarkdownReportRenderer())->render(comparison: $case['comparison'], policy: $case['policy'], violations: $case['violations']);
 
         $path = __DIR__ . '/snapshots/' . $snapshot . '.md';
         if (getenv('DAN_UPDATE_SNAPSHOTS') === '1') {
@@ -75,7 +76,7 @@ final class MarkdownReportSnapshotTest extends TestCase
     }
 
     /**
-     * @return array<string, array{comparison: RunComparison, violations: list<Violation>}>
+     * @return array<string, array{comparison: RunComparison, policy: Policy, violations: list<Violation>}>
      */
     private static function comparisonCases(): array
     {
@@ -130,7 +131,7 @@ final class MarkdownReportSnapshotTest extends TestCase
             ], unstableStatements: [
                 new StatementInstability(slot: RunSlot::Baseline, index: 3, divergence: StatementDivergence::Presence, observed: 5, iterations: 30),
                 new StatementInstability(slot: RunSlot::Candidate, index: 1, divergence: StatementDivergence::Text, observed: 30, iterations: 30),
-            ]),
+            ], withoutInterval: true),
             // Faster and wrong: fewer ids, a smaller total, and the
             // candidate did not even agree with itself between iterations.
             self::cell(scenario: 'product.deep-read', tier: Tier::M, database: $mysql, medianMs: [
@@ -181,8 +182,8 @@ final class MarkdownReportSnapshotTest extends TestCase
         ];
         // The violations come from the real gate, so the report renders what
         // CI would actually enforce.
-        $violations = (new Policy(maxWallRegressionPct: 10.0, failOnSqlChange: true))->evaluate($regressionCells);
-        $sqlChangeViolations = (new Policy(maxWallRegressionPct: null, failOnSqlChange: false))->evaluate($sqlChangeCells);
+        $policy = new Policy(maxWallRegressionPct: 10.0, failOnSqlChange: true);
+        $violations = $policy->evaluate($regressionCells);
 
         return [
             'clean-aa' => [
@@ -194,6 +195,7 @@ final class MarkdownReportSnapshotTest extends TestCase
                     cellsOnlyInBaseline: [],
                     cellsOnlyInCandidate: [],
                 ),
+                'policy' => $policy,
                 'violations' => [],
             ],
             'sql-change' => [
@@ -205,7 +207,8 @@ final class MarkdownReportSnapshotTest extends TestCase
                     cellsOnlyInBaseline: [],
                     cellsOnlyInCandidate: [],
                 ),
-                'violations' => $sqlChangeViolations,
+                'policy' => $policy,
+                'violations' => $policy->evaluate($sqlChangeCells),
             ],
             'regression-with-violations' => [
                 'comparison' => new RunComparison(
@@ -216,6 +219,7 @@ final class MarkdownReportSnapshotTest extends TestCase
                     cellsOnlyInBaseline: [],
                     cellsOnlyInCandidate: [],
                 ),
+                'policy' => $policy,
                 'violations' => $violations,
             ],
             'protocol-mismatch' => [
@@ -227,6 +231,7 @@ final class MarkdownReportSnapshotTest extends TestCase
                     cellsOnlyInBaseline: ['product.deep-read--S--mysql-8.0.json'],
                     cellsOnlyInCandidate: ['order.aggregation--S--mysql-8.0.json'],
                 ),
+                'policy' => $policy,
                 'violations' => [],
             ],
         ];
@@ -308,6 +313,7 @@ final class MarkdownReportSnapshotTest extends TestCase
         ],
         array $unstableStatements = [],
         ?array $blockMedianMs = null,
+        bool $withoutInterval = false,
         ?ResultSetComparison $resultSets = null,
     ): CellComparison {
         $resultSet = new ResultSet(ids: [
@@ -350,9 +356,11 @@ final class MarkdownReportSnapshotTest extends TestCase
             // A +-2 point interval around the estimate: wide enough that the
             // small deltas in these fixtures straddle zero, narrow enough
             // that the injected regression stays significant.
-            wallShift: new MedianShift(estimatePct: $estimatePct, lowerPct: $estimatePct - 2.0, upperPct: $estimatePct + 2.0, confidence: 0.95, resamples: 1000),
+            wallShift: $withoutInterval
+                ? MedianShift::withoutInterval(estimatePct: $estimatePct, confidence: 0.95)
+                : new MedianShift(estimatePct: $estimatePct, lowerPct: $estimatePct - 2.0, upperPct: $estimatePct + 2.0, confidence: 0.95, resamples: 1000),
             unstableStatements: $unstableStatements,
-            blocks: $blocks,
+            blocks: BlockComparisonCollection::create($blocks),
         );
     }
 }

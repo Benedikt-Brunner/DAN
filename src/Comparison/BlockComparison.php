@@ -7,7 +7,11 @@ namespace Dan\Harness\Comparison;
 use Dan\Harness\Measurement\Result\LatencyDelta;
 use Dan\Harness\Measurement\Result\SampleCollection;
 use Dan\Harness\Measurement\Result\Statistics;
+use Dan\Lib\Order\Ordered;
+use Dan\Lib\Order\Ordering;
+use Dan\Lib\Order\TotallyOrdered;
 use Dan\Lib\Time\Duration;
+use LogicException;
 
 /**
  * Baseline against candidate within one mirrored block pair. The two halves
@@ -15,7 +19,7 @@ use Dan\Lib\Time\Duration;
  * estimate a session offers; comparing the pairs with each other exposes
  * order effects (whichever slot ran first) and host drift over the session.
  */
-final class BlockComparison
+final class BlockComparison implements TotallyOrdered
 {
     public readonly Duration $baselineMedianWall;
     public readonly Duration $candidateMedianWall;
@@ -29,6 +33,18 @@ final class BlockComparison
     ) {
         $this->baselineMedianWall = Statistics::create($baselineSamples)->median();
         $this->candidateMedianWall = Statistics::create($candidateSamples)->median();
+    }
+
+    /**
+     * Block pairs are ordered by block index.
+     */
+    public function compareTo(Ordered $other): Ordering
+    {
+        if (!$other instanceof self) {
+            throw new LogicException(sprintf('%s is only ordered against its own kind, not %s.', self::class, $other::class));
+        }
+
+        return Ordering::between(left: $this->blockIndex, right: $other->blockIndex);
     }
 
     public function baselineRanFirst(): bool
