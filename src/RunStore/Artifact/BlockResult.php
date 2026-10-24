@@ -8,6 +8,7 @@ use Dan\Harness\Measurement\Result\SampleCollection;
 use Dan\Lib\Order\Ordered;
 use Dan\Lib\Order\Ordering;
 use Dan\Lib\Order\TotallyOrdered;
+use Dan\Lib\Protocol\ResultSet;
 use LogicException;
 use RuntimeException;
 
@@ -18,11 +19,14 @@ use RuntimeException;
  * host drift - so their membership is preserved rather than flattened away.
  *
  * @phpstan-import-type StatementProfilePayload from StatementProfile
+ * @phpstan-import-type ResultSetPayload from ResultSet
  *
  * @phpstan-type BlockResultPayload array{
  *     blockIndex: int,
  *     executionOrder: int,
  *     warmupIterations: int,
+ *     resultSet: ResultSetPayload,
+ *     resultSetConsistent: bool,
  *     wallNsSamples: list<int>,
  *     statements: list<StatementProfilePayload>
  * }
@@ -33,6 +37,8 @@ final class BlockResult implements TotallyOrdered
         public readonly int $blockIndex,
         public readonly int $executionOrder,
         public readonly int $warmupIterations,
+        public readonly ResultSet $resultSet,
+        public readonly bool $resultSetConsistent,
         public readonly SampleCollection $wallSamples,
         public readonly StatementProfileCollection $statements,
     ) {}
@@ -65,6 +71,8 @@ final class BlockResult implements TotallyOrdered
             'blockIndex' => $this->blockIndex,
             'executionOrder' => $this->executionOrder,
             'warmupIterations' => $this->warmupIterations,
+            'resultSet' => $this->resultSet->toArray(),
+            'resultSetConsistent' => $this->resultSetConsistent,
             'wallNsSamples' => $this->wallSamples->toNsArray(),
             'statements' => $this->statements->toArray(),
         ];
@@ -78,9 +86,11 @@ final class BlockResult implements TotallyOrdered
         $blockIndex = $payload['blockIndex'] ?? null;
         $executionOrder = $payload['executionOrder'] ?? null;
         $warmupIterations = $payload['warmupIterations'] ?? null;
+        $resultSet = $payload['resultSet'] ?? null;
+        $resultSetConsistent = $payload['resultSetConsistent'] ?? null;
         $wallSamples = $payload['wallNsSamples'] ?? null;
         $statements = $payload['statements'] ?? null;
-        if (!is_int($blockIndex) || !is_int($executionOrder) || !is_int($warmupIterations) || !is_array($wallSamples) || !is_array($statements)) {
+        if (!is_int($blockIndex) || !is_int($executionOrder) || !is_int($warmupIterations) || !is_array($resultSet) || !is_bool($resultSetConsistent) || !is_array($wallSamples) || !is_array($statements)) {
             throw new RuntimeException('Malformed block result payload.');
         }
 
@@ -88,6 +98,8 @@ final class BlockResult implements TotallyOrdered
             blockIndex: $blockIndex,
             executionOrder: $executionOrder,
             warmupIterations: $warmupIterations,
+            resultSet: ResultSet::fromDecodedArray($resultSet),
+            resultSetConsistent: $resultSetConsistent,
             wallSamples: SampleCollection::fromDecodedArray($wallSamples),
             statements: StatementProfileCollection::fromDecodedArray($statements),
         );

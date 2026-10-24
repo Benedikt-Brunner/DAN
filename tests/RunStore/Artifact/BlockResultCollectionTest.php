@@ -8,6 +8,7 @@ use Dan\Harness\Measurement\Result\SampleCollection;
 use Dan\Harness\RunStore\Artifact\BlockResult;
 use Dan\Harness\RunStore\Artifact\BlockResultCollection;
 use Dan\Harness\RunStore\Artifact\StatementProfileCollection;
+use Dan\Lib\Protocol\ResultSet;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
@@ -63,6 +64,8 @@ final class BlockResultCollectionTest extends TestCase
             blockIndex: $blockIndex,
             executionOrder: $executionOrder,
             warmupIterations: 0,
+            resultSet: new ResultSet(ids: [], total: 0),
+            resultSetConsistent: true,
             wallSamples: SampleCollection::fromArray([1_000]),
             statements: StatementProfileCollection::create([]),
         );

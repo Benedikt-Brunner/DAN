@@ -13,13 +13,29 @@ Gate: a cell fails when its estimated median shift exceeds +10.0% and its 95% in
 ## Gate violations
 
 - :x: product.deep-read / S / mysql-8.0: generated SQL changed (~1, ~3, +4)
+- :x: product.deep-read / M / mysql-8.0: the implementations returned different results (different ids (3 in baseline, 2 in candidate); total 120 in baseline, 118 in candidate; the candidate run returned varying results between its own iterations)
+
+## Result divergence
+
+> [!CAUTION]
+> The two implementations did not return the same result for these cells. Their latency deltas compare different work and must not be read as performance.
+
+- product.deep-read / M / mysql-8.0: different ids (3 in baseline, 2 in candidate); total 120 in baseline, 118 in candidate; the candidate run returned varying results between its own iterations
+
+## M / mysql-8.0
+
+| Scenario | Result | Statements | SQL | Median baseline | Median candidate | Delta | p95 baseline | p95 candidate |
+|---|---|---|---|---:|---:|---:|---:|---:|
+| product.deep-read | :x: differs | 4 -> 4 | unchanged | 40.00ms | 31.00ms | -22.5% [-24.5%, -20.5%] | 44.00ms* | 35.50ms* |
+
+Delta: estimated median shift with its 95% bootstrap interval. \* p95 from fewer than 100 samples is close to the largest observed value and only indicative.
 
 ## S / mysql-8.0
 
-| Scenario | Statements | SQL | Median baseline | Median candidate | Delta | p95 baseline | p95 candidate |
-|---|---|---|---:|---:|---:|---:|---:|
-| product.deep-read | 4 -> 5 | :warning: changed (~1, ~3, +4) | 12.50ms | 12.60ms | +0.8% [-1.2%, +2.8%] | 14.10ms* | 14.30ms* |
-| synthetic.json-path | 4 -> 4 | unchanged :grey_question: baseline #3 intermittent (5/30); candidate #1 SQL varies (30/30) | 3.00ms | 3.10ms | +3.3% [no interval] | 3.40ms* | 3.50ms* |
+| Scenario | Result | Statements | SQL | Median baseline | Median candidate | Delta | p95 baseline | p95 candidate |
+|---|---|---|---|---:|---:|---:|---:|---:|
+| product.deep-read | identical | 4 -> 5 | :warning: changed (~1, ~3, +4) | 12.50ms | 12.60ms | +0.8% [-1.2%, +2.8%] | 14.10ms* | 14.30ms* |
+| synthetic.json-path | identical | 4 -> 4 | unchanged :grey_question: baseline #3 intermittent (5/30); candidate #1 SQL varies (30/30) | 3.00ms | 3.10ms | +3.3% [no interval] | 3.40ms* | 3.50ms* |
 
 Delta: estimated median shift with its 95% bootstrap interval. "no interval": a block pair has fewer than 2 samples on a side, or a block lacks its mirrored partner (an interrupted run), so the shift cannot be resampled and does not gate. \* p95 from fewer than 100 samples is close to the largest observed value and only indicative.
 
@@ -33,3 +49,5 @@ Median wall time per mirrored block pair. "Order" is which slot ran first within
 | product.deep-read / S / mysql-8.0 | 1 | candidate first | 12.50ms | 12.60ms | +0.8% |
 | synthetic.json-path / S / mysql-8.0 | 0 | baseline first | 3.00ms | 3.10ms | +3.3% |
 | synthetic.json-path / S / mysql-8.0 | 1 | candidate first | 3.00ms | 3.10ms | +3.3% |
+| product.deep-read / M / mysql-8.0 | 0 | baseline first | 40.00ms | 31.00ms | -22.5% |
+| product.deep-read / M / mysql-8.0 | 1 | candidate first | 40.00ms | 31.00ms | -22.5% |

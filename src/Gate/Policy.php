@@ -15,6 +15,10 @@ use Dan\Harness\Comparison\CellComparison;
  * over two point estimates: the shift's confidence interval must exclude
  * zero (the difference is not resampling noise) AND the estimated shift must
  * exceed the limit (the difference matters).
+ *
+ * Result divergence is not configurable: a candidate returning different
+ * rows, a different order or a different total than the baseline is a
+ * correctness failure, whatever the SQL and latency look like.
  */
 final class Policy
 {
@@ -32,6 +36,9 @@ final class Policy
     {
         $violations = [];
         foreach ($cells as $cell) {
+            if (!$cell->resultSets->equivalent()) {
+                $violations[] = new Violation(kind: ViolationKind::ResultDivergence, cell: $cell);
+            }
             if ($this->failOnSqlChange && $cell->sqlChanged()) {
                 $violations[] = new Violation(kind: ViolationKind::SqlChanged, cell: $cell);
             }

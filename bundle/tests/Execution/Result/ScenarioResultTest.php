@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Dan\Probe\Tests\Execution\Result;
 
 use Dan\Lib\Filesystem\AbsolutePath;
+use Dan\Lib\Protocol\ResultSet;
 use Dan\Lib\Protocol\StatementDivergence;
 use Dan\Probe\Execution\Result\ScenarioResult;
 use Dan\Probe\Execution\Result\ScenarioResultWriter;
@@ -22,6 +23,8 @@ final class ScenarioResultTest extends TestCase
             dalVersion: '6.6.0',
             warmupIterations: 1,
             measuredIterations: 2,
+            resultSet: new ResultSet(ids: ['a1'], total: 1),
+            resultSetConsistent: false,
             wallSamplesNs: [
                 100,
                 200,
@@ -45,6 +48,11 @@ final class ScenarioResultTest extends TestCase
             'dalVersion' => '6.6.0',
             'warmupIterations' => 1,
             'measuredIterations' => 2,
+            'resultSet' => [
+                'ids' => ['a1'],
+                'total' => 1,
+            ],
+            'resultSetConsistent' => false,
             'wallNsSamples' => [
                 100,
                 200,
@@ -72,6 +80,8 @@ final class ScenarioResultTest extends TestCase
             dalVersion: null,
             warmupIterations: 0,
             measuredIterations: 0,
+            resultSet: new ResultSet(ids: [], total: 0),
+            resultSetConsistent: true,
             wallSamplesNs: [],
             statements: [],
         );
@@ -109,6 +119,8 @@ final class ScenarioResultTest extends TestCase
             dalVersion: null,
             warmupIterations: 0,
             measuredIterations: 0,
+            resultSet: new ResultSet(ids: [], total: 0),
+            resultSetConsistent: true,
             wallSamplesNs: [],
             statements: [],
         );

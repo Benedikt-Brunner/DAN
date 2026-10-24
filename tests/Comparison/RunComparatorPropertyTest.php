@@ -61,6 +61,13 @@ final class RunComparatorPropertyTest extends PropertyTestCase
 
                         self::assertFalse($cell->sqlChanged());
                         self::assertSame([], $cell->alignment->changes());
+                        // Identical runs return identical results - but a run
+                        // whose own iterations disagreed is not equivalent to
+                        // anything, itself included.
+                        self::assertSame($written[$fileName]->resultSetConsistent(), $cell->resultSets->equivalent());
+                        self::assertFalse($cell->resultSets->idsDiffer());
+                        self::assertFalse($cell->resultSets->orderDiffers());
+                        self::assertFalse($cell->resultSets->totalDiffers());
                         self::assertSame(0.0, $cell->wallDeltaPct());
                         self::assertFalse($cell->wallShift->excludesZero(), 'Identical runs must never look significantly different.');
                         self::assertSame($cell->baselineStatementCount, $cell->candidateStatementCount);
@@ -183,6 +190,8 @@ final class RunComparatorPropertyTest extends PropertyTestCase
                                 blockIndex: $lastBlock->blockIndex + 1,
                                 executionOrder: $lastBlock->executionOrder + 2,
                                 warmupIterations: $lastBlock->warmupIterations,
+                                resultSet: $lastBlock->resultSet,
+                                resultSetConsistent: $lastBlock->resultSetConsistent,
                                 wallSamples: SampleCollection::fromArray($secondBlockWallSamples),
                                 statements: $lastBlock->statements,
                             ),
@@ -253,6 +262,8 @@ final class RunComparatorPropertyTest extends PropertyTestCase
                 blockIndex: $block->blockIndex,
                 executionOrder: $block->executionOrder,
                 warmupIterations: $block->warmupIterations,
+                resultSet: $block->resultSet,
+                resultSetConsistent: $block->resultSetConsistent,
                 wallSamples: $block->wallSamples,
                 statements: StatementProfileCollection::create($statements),
             );

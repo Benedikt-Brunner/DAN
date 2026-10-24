@@ -5,6 +5,14 @@
     "dalVersion": "v6.6.10.22",
     "warmupIterations": 1,
     "measuredIterations": 3,
+    "resultSet": {
+        "ids": [
+            "0190d3d0a1b74a1c9f0e7b2c6d5e4f30",
+            "0190d3d0a1b74a1c9f0e7b2c6d5e4f31"
+        ],
+        "total": 2
+    },
+    "resultSetConsistent": true,
     "wallNsSamples": [
         1250000,
         1190000,
