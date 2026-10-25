@@ -48,8 +48,7 @@ final class BlockScheduler
             $ordered = $block % 2 === 0 ? $slots : array_reverse($slots);
             foreach ($ordered as $slot) {
                 $warmup = $protocol->blockWarmupIterations;
-                $firstBlockOfSlot = !$cellWarmed->contains($slot);
-                if ($firstBlockOfSlot) {
+                if (!$cellWarmed->contains($slot)) {
                     $warmup += $protocol->warmupIterations;
                     $cellWarmed = $cellWarmed->with($slot);
                 }
@@ -59,7 +58,6 @@ final class BlockScheduler
                     iterations: $iterations,
                     blockIndex: $block,
                     executionOrder: count($plan),
-                    capturePlans: $firstBlockOfSlot,
                 );
             }
         }

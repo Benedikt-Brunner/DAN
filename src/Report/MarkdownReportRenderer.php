@@ -373,13 +373,13 @@ final class MarkdownReportRenderer
         $markdown
             ->heading('Query plans of changed statements')
             ->blankLine()
-            ->line('Captured with `EXPLAIN FORMAT=JSON` after timing, bound to the parameter values the DAL used. Row counts are the optimizer\'s estimates.')
+            ->line('Captured after timing, bound to the parameter values the DAL used. The plan columns read the optimizer\'s estimated plan (`EXPLAIN FORMAT=JSON`), so their row counts are estimates; what each plan actually did on one more execution (`EXPLAIN ANALYZE`) follows the table as the engine printed it.')
             ->blankLine()
             ->tableRow([
                 'Cell',
                 'Statement',
-                'Plan A',
-                'Plan B',
+                'Baseline plan',
+                'Candidate plan',
                 'Material changes',
             ])
             ->line('|---|---|---|---|---|');
@@ -390,6 +390,47 @@ final class MarkdownReportRenderer
             }
         }
         $markdown->blankLine();
+        foreach ($cellsWithChanges as $cell) {
+            $cellName = sprintf('%s / %s / %s', $cell->scenario->toString(), $cell->tier->value, $cell->database->id());
+            foreach ($cell->planChanges as $planChange) {
+                $this->appendPlanAnalysis(markdown: $markdown, cellName: $cellName, planChange: $planChange);
+            }
+        }
+    }
+
+    /**
+     * The engine's EXPLAIN ANALYZE output of both sides, collapsed: actual
+     * rows and time per plan step, verbatim, for whoever needs more than the
+     * estimated facts in the table.
+     */
+    private function appendPlanAnalysis(MarkdownBuilder $markdown, string $cellName, StatementPlanComparison $planChange): void
+    {
+        $baseline = $planChange->baseline?->analysis;
+        $candidate = $planChange->candidate?->analysis;
+        if ($baseline === null && $candidate === null) {
+            return;
+        }
+
+        $markdown
+            ->line('<details>')
+            ->line(sprintf('<summary>EXPLAIN ANALYZE: %s, statement %s</summary>', $cellName, $this->describeChange($planChange->statement)))
+            ->blankLine();
+        $this->appendAnalysisSide(markdown: $markdown, side: 'Baseline', analysis: $baseline, description: $planChange->describeBaseline());
+        $this->appendAnalysisSide(markdown: $markdown, side: 'Candidate', analysis: $candidate, description: $planChange->describeCandidate());
+        $markdown->line('</details>')->blankLine();
+    }
+
+    /**
+     * A side without an analysis says why, in the table's own words.
+     */
+    private function appendAnalysisSide(MarkdownBuilder $markdown, string $side, ?string $analysis, string $description): void
+    {
+        if ($analysis === null) {
+            $markdown->line(sprintf('%s: %s', $side, $description))->blankLine();
+
+            return;
+        }
+        $markdown->line(sprintf('%s:', $side))->blankLine()->codeBlock($analysis)->blankLine();
     }
 
     /** @return list<string> */

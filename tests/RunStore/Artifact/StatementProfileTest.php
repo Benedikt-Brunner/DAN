@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Dan\Harness\Tests\RunStore\Artifact;
 
 use Dan\Harness\Measurement\Result\SampleCollection;
+use Dan\Harness\Plan\QueryPlan;
 use Dan\Harness\RunStore\Artifact\StatementProfile;
+use Dan\Lib\Protocol\PlanCapture;
 use Dan\Lib\Protocol\StatementDivergence;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -99,7 +101,7 @@ final class StatementProfileTest extends TestCase
             durationSamples: SampleCollection::fromArray($samples),
             observed: $observed,
             divergence: $divergence,
-            plan: null,
+            plan: new QueryPlan(capture: PlanCapture::Unsupported, raw: null, analysis: null),
         );
     }
 }

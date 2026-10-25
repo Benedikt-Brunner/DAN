@@ -38,7 +38,7 @@ final class StatementPlanComparisonTest extends TestCase
             statement: new AlignedStatement(kind: AlignmentKind::Inserted, baselineIndex: null, candidateIndex: 4),
             engine: Engine::MariaDb,
             baseline: null,
-            candidate: new QueryPlan(capture: PlanCapture::Unsupported, raw: null),
+            candidate: new QueryPlan(capture: PlanCapture::Unsupported, raw: null, analysis: null),
         );
 
         self::assertSame('no statement', $inserted->describeBaseline());
@@ -52,7 +52,7 @@ final class StatementPlanComparisonTest extends TestCase
         $comparison = new StatementPlanComparison(
             statement: new AlignedStatement(kind: AlignmentKind::Removed, baselineIndex: 2, candidateIndex: null),
             engine: Engine::MySql,
-            baseline: new QueryPlan(capture: PlanCapture::Failed, raw: null),
+            baseline: new QueryPlan(capture: PlanCapture::Failed, raw: null, analysis: null),
             candidate: null,
         );
 
@@ -76,6 +76,6 @@ final class StatementPlanComparisonTest extends TestCase
                 'select_id' => 1,
                 'table' => $table,
             ],
-        ]);
+        ], analysis: sprintf('-> %s on product  (actual time=0.01..0.02 rows=%d loops=1)', $accessType, $rows));
     }
 }

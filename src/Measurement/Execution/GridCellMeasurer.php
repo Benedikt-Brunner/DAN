@@ -105,9 +105,6 @@ final class GridCellMeasurer
                     $args[] = '--filter';
                     $args[] = $protocol->scenarioFilter;
                 }
-                if ($block->capturePlans) {
-                    $args[] = '--capture-plans';
-                }
                 $run->runtime->run(args: $args, database: $instances[$slot]);
 
                 foreach (glob($blockDir->join('*.json')->toString()) ?: [] as $scenarioFileValue) {
