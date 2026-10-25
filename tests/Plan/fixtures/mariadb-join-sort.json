@@ -1,0 +1,73 @@
+{
+    "query_block": {
+        "select_id": 1,
+        "cost": 1.8611394,
+        "nested_loop": [
+            {
+                "table": {
+                    "table_name": "product",
+                    "access_type": "range",
+                    "possible_keys": [
+                        "idx_stock"
+                    ],
+                    "key": "idx_stock",
+                    "key_length": "4",
+                    "used_key_parts": [
+                        "stock"
+                    ],
+                    "loops": 1,
+                    "rows": 900,
+                    "cost": 0.1798384,
+                    "filtered": 100,
+                    "attached_condition": "product.version_id = '?�?��jK¾K��u,4%' and product.stock >= 10"
+                }
+            },
+            {
+                "table": {
+                    "table_name": "product.tax",
+                    "access_type": "eq_ref",
+                    "possible_keys": [
+                        "PRIMARY"
+                    ],
+                    "key": "PRIMARY",
+                    "key_length": "16",
+                    "used_key_parts": [
+                        "id"
+                    ],
+                    "ref": [
+                        "dan.product.tax_id"
+                    ],
+                    "loops": 900,
+                    "rows": 1,
+                    "cost": 0.8058152,
+                    "filtered": 100,
+                    "attached_condition": "trigcond(trigcond(product.tax_id is not null))"
+                }
+            },
+            {
+                "table": {
+                    "table_name": "product.translation",
+                    "access_type": "ref",
+                    "possible_keys": [
+                        "PRIMARY"
+                    ],
+                    "key": "PRIMARY",
+                    "key_length": "32",
+                    "used_key_parts": [
+                        "product_id",
+                        "language_id"
+                    ],
+                    "ref": [
+                        "dan.product.id",
+                        "const"
+                    ],
+                    "loops": 900,
+                    "rows": 1,
+                    "cost": 0.8754858,
+                    "filtered": 100,
+                    "attached_condition": "trigcond(`product.translation`.language_id = <cache>(unhex('2fbb5fe2e29a4d70aa5854ce7ce3e20b')))"
+                }
+            }
+        ]
+    }
+}

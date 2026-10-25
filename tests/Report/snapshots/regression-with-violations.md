@@ -24,6 +24,14 @@ Gate: a cell fails when its estimated median shift exceeds +10.0% and its 95% in
 
 Delta: estimated median shift with its 95% bootstrap interval. \* p95 from fewer than 100 samples is close to the largest observed value and only indicative.
 
+## Query plans of changed statements
+
+Captured after timing, bound to the parameter values the DAL used. The plan columns read the optimizer's estimated plan (`EXPLAIN FORMAT=JSON`), so their row counts are estimates; what each plan actually did on one more execution (`EXPLAIN ANALYZE`) follows the table as the engine printed it.
+
+| Cell | Statement | Baseline plan | Candidate plan | Material changes |
+|---|---|---|---|---|
+| product.keyword-listing / S / mysql-8.0 | ~0 | not explainable | not explainable | n/a |
+
 ## Block diagnostics
 
 Median wall time per mirrored block pair. "Order" is which slot ran first within the pair; a delta that flips sign between pairs points at an order effect or host drift rather than at the implementation.

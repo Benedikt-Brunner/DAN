@@ -9,6 +9,7 @@ use Dan\Lib\Protocol\ResultSet;
 use Dan\Lib\Time\Timestamp;
 use Dan\Probe\Execution\Result\ScenarioResult;
 use Dan\Probe\Recorder\QueryRecorder;
+use Dan\Probe\Recorder\RecordedStatement;
 use Dan\Probe\Scenario\Scenario;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\DefinitionInstanceRegistry;
@@ -23,6 +24,7 @@ final readonly class ScenarioMeasurer
     public function __construct(
         private DefinitionInstanceRegistry $definitionRegistry,
         private QueryRecorder $recorder,
+        private QueryPlanCapture $planCapture,
     ) {}
 
     public function measure(
@@ -44,6 +46,8 @@ final readonly class ScenarioMeasurer
             /** @var array<int, StatementMeasurementAccumulator> $statements */
             $statements = [];
             $resultSets = new ResultSetAccumulator();
+            /** @var array<int, RecordedStatement> $lastRecorded */
+            $lastRecorded = [];
             for ($iteration = 0; $iteration < $iterations; ++$iteration) {
                 $this->recorder->drain();
                 $startedAt = Timestamp::now();
@@ -59,11 +63,18 @@ final readonly class ScenarioMeasurer
                         sql: $recordedStatement->sql,
                     );
                     $statements[$index]->record($recordedStatement);
+                    $lastRecorded[$index] = $recordedStatement;
                 }
             }
         } finally {
             $this->recorder->stop();
         }
+
+        // Plans come after timing, with the recorder stopped, so neither
+        // EXPLAIN nor the extra execution ANALYZE performs ever shows up in
+        // the samples. Each position is bound to the parameter values of its
+        // last recorded execution, the ones the engine actually planned for.
+        $plans = $this->planCapture->captureAll($lastRecorded);
 
         return new ScenarioResult(
             scenario: $scenario->name(),
@@ -77,7 +88,8 @@ final readonly class ScenarioMeasurer
             resultSetConsistent: $resultSets->consistent(),
             wallSamplesNs: $wallSamplesNs,
             statements: array_map(
-                fn (StatementMeasurementAccumulator $statement) => $statement->result($iterations),
+                fn (int $index, StatementMeasurementAccumulator $statement) => $statement->result(iterations: $iterations, plan: $plans[$index]),
+                array_keys($statements),
                 array_values($statements),
             ),
         );

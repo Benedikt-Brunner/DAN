@@ -156,6 +156,7 @@ final class PolicyTest extends TestCase
             candidateP95Wall: Duration::fromNs(12_000_000),
             wallShift: $shift,
             unstableStatements: [],
+            planChanges: [],
             blocks: BlockComparisonCollection::create([]),
         );
     }

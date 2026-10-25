@@ -28,7 +28,22 @@
                 402000
             ],
             "observed": 3,
-            "divergence": "none"
+            "divergence": "none",
+            "plan": {
+                "capture": "captured",
+                "raw": {
+                    "query_block": {
+                        "select_id": 1,
+                        "table": {
+                            "table_name": "product",
+                            "access_type": "range",
+                            "key": "PRIMARY",
+                            "rows_examined_per_scan": 3
+                        }
+                    }
+                },
+                "analysis": "-> Filter: (`product`.id in (?,?,?))  (cost=1.86 rows=3) (actual time=0.0213..0.0301 rows=2 loops=1)\n    -> Covering index range scan on product using PRIMARY over (id = ?) OR (id = ?) OR (id = ?)  (cost=1.86 rows=3) (actual time=0.0198..0.0279 rows=2 loops=1)\n"
+            }
         },
         {
             "index": 1,
@@ -39,7 +54,12 @@
                 322000
             ],
             "observed": 2,
-            "divergence": "text-and-presence"
+            "divergence": "text-and-presence",
+            "plan": {
+                "capture": "unsupported",
+                "raw": null,
+                "analysis": null
+            }
         }
     ]
 }

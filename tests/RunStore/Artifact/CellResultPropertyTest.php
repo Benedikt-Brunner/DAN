@@ -184,6 +184,7 @@ final class CellResultPropertyTest extends PropertyTestCase
                     durationSamples: $statement->durationSamples,
                     observed: $statement->observed,
                     divergence: $statement->divergence,
+                    plan: $statement->plan,
                 );
             }
             $laterBlock = self::withBlocks(cell: $cell, blocks: [self::blockAfter(cell: $cell, statements: StatementProfileCollection::create($changed))]);
@@ -249,6 +250,40 @@ final class CellResultPropertyTest extends PropertyTestCase
 
             self::assertFalse($merged->resultSetConsistent());
             self::assertTrue($merged->resultSet()->equals($cell->resultSet()), 'The earliest block names the recorded result.');
+        });
+    }
+
+    public function testACorruptedPlanCaptureIsRefused(): void
+    {
+        $this->forAll(DomainGenerators::cellResult())->then(function (CellResult $cell): void {
+            $payload = $cell->toArray();
+            $payload['blocks'][0]['statements'][0]['plan'] = [
+                'capture' => 'maybe',
+                'raw' => null,
+                'analysis' => null,
+            ];
+
+            try {
+                CellResult::fromDecodedArray($payload);
+            } catch (RuntimeException) {
+                $this->addToAssertionCount(1);
+
+                return;
+            }
+
+            self::fail('An unknown plan capture outcome was accepted.');
+        });
+    }
+
+    public function testPooledStatementsKeepTheEarliestBlocksPlan(): void
+    {
+        // Every block captures plans; the pooled view must take the one
+        // measured first in the session, whatever order blocks merged in.
+        $this->forAll(DomainGenerators::cellResult())->then(function (CellResult $cell): void {
+            $earliest = $cell->blocks->getItems()[0];
+            foreach ($cell->statements() as $index => $statement) {
+                self::assertSame($earliest->statements[$index]->plan->toArray(), $statement->plan->toArray());
+            }
         });
     }
 
@@ -467,6 +502,37 @@ final class CellResultPropertyTest extends PropertyTestCase
                 ],
                 'sometimes',
             ],
+            [
+                [
+                    'blocks',
+                    0,
+                    'statements',
+                    0,
+                    'plan',
+                ],
+                'yes',
+            ],
+            [
+                [
+                    'blocks',
+                    0,
+                    'statements',
+                    0,
+                    'plan',
+                ],
+                null,
+            ],
+            [
+                [
+                    'blocks',
+                    0,
+                    'statements',
+                    0,
+                    'plan',
+                    'analysis',
+                ],
+                42,
+            ],
         ];
 
         $this->forAll(
@@ -593,6 +659,7 @@ final class CellResultPropertyTest extends PropertyTestCase
                 durationSamples: $statement->durationSamples,
                 observed: $statement->observed,
                 divergence: StatementDivergence::fromFlags(textDiffers: $textDiffers, intermittent: $statement->divergence->includesPresence()),
+                plan: $statement->plan,
             );
         }
 

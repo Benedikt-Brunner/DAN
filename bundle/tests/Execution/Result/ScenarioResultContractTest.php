@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Dan\Probe\Tests\Execution\Result;
 
+use Dan\Lib\Protocol\PlanCapture;
 use Dan\Lib\Protocol\ResultSet;
 use Dan\Lib\Protocol\StatementDivergence;
+use Dan\Probe\Execution\Result\CapturedPlan;
 use Dan\Probe\Execution\Result\ScenarioResult;
 use Dan\Probe\Execution\Result\StatementResult;
 use PHPUnit\Framework\TestCase;
@@ -19,6 +21,12 @@ use RuntimeException;
  */
 final class ScenarioResultContractTest extends TestCase
 {
+    private const ANALYSIS = <<<'TREE'
+        -> Filter: (`product`.id in (?,?,?))  (cost=1.86 rows=3) (actual time=0.0213..0.0301 rows=2 loops=1)
+            -> Covering index range scan on product using PRIMARY over (id = ?) OR (id = ?) OR (id = ?)  (cost=1.86 rows=3) (actual time=0.0198..0.0279 rows=2 loops=1)
+
+        TREE;
+
     public function testScenarioResultSerializesExactlyToTheContractFixture(): void
     {
         $result = new ScenarioResult(
@@ -48,6 +56,17 @@ final class ScenarioResultContractTest extends TestCase
                     ],
                     observed: 3,
                     divergence: StatementDivergence::None,
+                    plan: new CapturedPlan(capture: PlanCapture::Captured, plan: [
+                        'query_block' => [
+                            'select_id' => 1,
+                            'table' => [
+                                'table_name' => 'product',
+                                'access_type' => 'range',
+                                'key' => 'PRIMARY',
+                                'rows_examined_per_scan' => 3,
+                            ],
+                        ],
+                    ], analysis: self::ANALYSIS),
                 ),
                 new StatementResult(
                     index: 1,
@@ -59,6 +78,7 @@ final class ScenarioResultContractTest extends TestCase
                     ],
                     observed: 2,
                     divergence: StatementDivergence::TextAndPresence,
+                    plan: CapturedPlan::unsupported(),
                 ),
             ],
         );

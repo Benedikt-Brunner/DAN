@@ -1,0 +1,28 @@
+{
+    "query_block": {
+        "select_id": 1,
+        "cost": 0.0042687,
+        "nested_loop": [
+            {
+                "table": {
+                    "table_name": "product",
+                    "access_type": "range",
+                    "possible_keys": [
+                        "PRIMARY"
+                    ],
+                    "key": "PRIMARY",
+                    "key_length": "32",
+                    "used_key_parts": [
+                        "id",
+                        "version_id"
+                    ],
+                    "loops": 1,
+                    "rows": 2,
+                    "cost": 0.0042687,
+                    "filtered": 100,
+                    "attached_condition": "product.version_id = <cache>(unhex('0fa91ce3e96a4bc2be4bd9ce752c3425')) and product.`id` in (<cache>(unhex(lpad(hex(1),32,'0'))),<cache>(unhex(lpad(hex(2),32,'0'))))"
+                }
+            }
+        ]
+    }
+}

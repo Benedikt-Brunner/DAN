@@ -9,6 +9,7 @@ use Dan\Harness\Measurement\Scheduling\RunSlot;
 use Dan\Harness\Protocol\DatabaseTarget;
 use Dan\Harness\Protocol\Engine;
 use Dan\Harness\RunStore\Artifact\CellResult;
+use Dan\Lib\Protocol\PlanCapture;
 use Dan\Lib\Protocol\StatementDivergence;
 use Dan\Lib\Protocol\Tier;
 use PHPUnit\Framework\TestCase;
@@ -61,6 +62,19 @@ final class CellResultContractTest extends TestCase
         ], $statements[0]->durationSamples->toNsArray());
         self::assertSame(3, $statements[0]->observed);
         self::assertSame(StatementDivergence::None, $statements[0]->divergence);
+        self::assertSame(PlanCapture::Captured, $statements[0]->plan->capture);
+        self::assertSame([
+            'query_block' => [
+                'select_id' => 1,
+                'table' => [
+                    'table_name' => 'product',
+                    'access_type' => 'range',
+                    'key' => 'PRIMARY',
+                    'rows_examined_per_scan' => 3,
+                ],
+            ],
+        ], $statements[0]->plan->raw);
+        self::assertSame("-> Filter: (`product`.id in (?,?,?))  (cost=1.86 rows=3) (actual time=0.0213..0.0301 rows=2 loops=1)\n    -> Covering index range scan on product using PRIMARY over (id = ?) OR (id = ?) OR (id = ?)  (cost=1.86 rows=3) (actual time=0.0198..0.0279 rows=2 loops=1)\n", $statements[0]->plan->analysis);
         self::assertSame(1, $statements[1]->index);
         self::assertSame('SELECT `category`.`id`, `category`.`name` FROM `category` WHERE `category`.`id` = ?', $statements[1]->sql);
         self::assertSame([
@@ -70,6 +84,9 @@ final class CellResultContractTest extends TestCase
         ], $statements[1]->durationSamples->toNsArray());
         self::assertSame(2, $statements[1]->observed);
         self::assertSame(StatementDivergence::TextAndPresence, $statements[1]->divergence);
+        self::assertSame(PlanCapture::Unsupported, $statements[1]->plan->capture);
+        self::assertNull($statements[1]->plan->raw);
+        self::assertNull($statements[1]->plan->analysis);
     }
 
     /**

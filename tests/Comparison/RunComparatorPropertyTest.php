@@ -61,6 +61,7 @@ final class RunComparatorPropertyTest extends PropertyTestCase
 
                         self::assertFalse($cell->sqlChanged());
                         self::assertSame([], $cell->alignment->changes());
+                        self::assertSame([], $cell->planChanges, 'No changed statements, no plans to compare.');
                         // Identical runs return identical results - but a run
                         // whose own iterations disagreed is not equivalent to
                         // anything, itself included.
@@ -256,6 +257,7 @@ final class RunComparatorPropertyTest extends PropertyTestCase
                     durationSamples: $statement->durationSamples,
                     observed: $statement->observed,
                     divergence: StatementDivergence::fromFlags(textDiffers: $divergent, intermittent: false),
+                    plan: $statement->plan,
                 );
             }
             $blocks[] = new BlockResult(

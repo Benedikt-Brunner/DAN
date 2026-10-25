@@ -21,6 +21,7 @@ final class CellComparison
 
     /**
      * @param list<StatementInstability> $unstableStatements positions that diverged within either run
+     * @param list<StatementPlanComparison> $planChanges the plans behind every aligned change, in alignment order
      */
     public function __construct(
         public readonly ScenarioName $scenario,
@@ -38,6 +39,7 @@ final class CellComparison
         public readonly Duration $candidateP95Wall,
         public readonly MedianShift $wallShift,
         public readonly array $unstableStatements,
+        public readonly array $planChanges,
         public readonly BlockComparisonCollection $blocks,
     ) {}
 

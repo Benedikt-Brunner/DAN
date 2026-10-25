@@ -13,6 +13,7 @@ use Dan\Harness\Comparison\ResultSetComparison;
 use Dan\Harness\Comparison\RunComparison;
 use Dan\Harness\Comparison\StatementAlignment;
 use Dan\Harness\Comparison\StatementInstability;
+use Dan\Harness\Comparison\StatementPlanComparison;
 use Dan\Harness\Environment\DatabaseImage;
 use Dan\Harness\Environment\DatabaseNetworkPath;
 use Dan\Harness\Environment\DockerEngine;
@@ -26,11 +27,13 @@ use Dan\Harness\Measurement\Result\LatencyDelta;
 use Dan\Harness\Measurement\Result\MedianShift;
 use Dan\Harness\Measurement\Result\SampleCollection;
 use Dan\Harness\Measurement\Scheduling\RunSlot;
+use Dan\Harness\Plan\QueryPlan;
 use Dan\Harness\Protocol\DatabaseTarget;
 use Dan\Harness\Protocol\Engine;
 use Dan\Harness\Protocol\Protocol;
 use Dan\Harness\Report\MarkdownReportRenderer;
 use Dan\Harness\RunStore\Artifact\RunManifest;
+use Dan\Lib\Protocol\PlanCapture;
 use Dan\Lib\Protocol\ResultSet;
 use Dan\Lib\Protocol\ScenarioName;
 use Dan\Lib\Protocol\StatementDivergence;
@@ -126,6 +129,19 @@ final class MarkdownReportSnapshotTest extends TestCase
             ], statementCounts: [
                 4,
                 5,
+            ], planChanges: [
+                [
+                    self::mysqlPlan(accessType: 'ref', key: 'idx_product_number', rows: 1),
+                    self::mysqlPlan(accessType: 'ALL', key: null, rows: 1000, temporary: true, filesort: true),
+                ],
+                [
+                    self::mysqlPlan(accessType: 'eq_ref', key: 'PRIMARY', rows: 1),
+                    self::mysqlPlan(accessType: 'eq_ref', key: 'PRIMARY', rows: 1),
+                ],
+                [
+                    null,
+                    new QueryPlan(capture: PlanCapture::Unsupported, raw: null, analysis: null),
+                ],
             ]),
             self::cell(scenario: 'synthetic.json-path', tier: Tier::S, database: $mysql, medianMs: [
                 3.0,
@@ -259,6 +275,29 @@ final class MarkdownReportSnapshotTest extends TestCase
         );
     }
 
+    private static function mysqlPlan(string $accessType, ?string $key, int $rows, bool $temporary = false, bool $filesort = false): QueryPlan
+    {
+        $table = [
+            'table_name' => 'product',
+            'access_type' => $accessType,
+            'rows_examined_per_scan' => $rows,
+        ];
+        if ($key !== null) {
+            $table['key'] = $key;
+        }
+
+        return new QueryPlan(capture: PlanCapture::Captured, raw: [
+            'query_block' => [
+                'select_id' => 1,
+                'ordering_operation' => [
+                    'using_temporary_table' => $temporary,
+                    'using_filesort' => $filesort,
+                    'table' => $table,
+                ],
+            ],
+        ], analysis: sprintf("-> Sort: `product`.`name`  (actual time=0.41..0.42 rows=%d loops=1)\n    -> %s on product  (cost=1.2 rows=%d) (actual time=0.02..0.31 rows=%d loops=1)\n", $rows, $accessType, $rows, $rows));
+    }
+
     /**
      * Positions in $changedIndices are modifications, every other shared
      * position is unchanged, and statements beyond the shorter sequence are
@@ -329,6 +368,7 @@ final class MarkdownReportSnapshotTest extends TestCase
      * @param list<StatementInstability> $unstableStatements
      * @param list<array{float, float}>|null $blockMedianMs baseline and candidate median per mirrored block pair; defaults to two pairs at the cell medians
      * @param ResultSetComparison|null $resultSets defaults to identical, consistent results
+     * @param list<array{QueryPlan|null, QueryPlan|null}> $planChanges baseline and candidate plan per aligned change, in alignment order
      */
     private static function cell(
         string $scenario,
@@ -345,6 +385,7 @@ final class MarkdownReportSnapshotTest extends TestCase
         ?array $blockMedianMs = null,
         bool $withoutInterval = false,
         ?ResultSetComparison $resultSets = null,
+        array $planChanges = [],
     ): CellComparison {
         $resultSet = new ResultSet(ids: [
             '0190d3d0a1b74a1c9f0e7b2c6d5e4f30',
@@ -376,7 +417,7 @@ final class MarkdownReportSnapshotTest extends TestCase
             baselineStatementCount: $statementCounts[0],
             candidateStatementCount: $statementCounts[1],
             resultSets: $resultSets ?? new ResultSetComparison(baseline: $resultSet, candidate: $resultSet, baselineConsistent: true, candidateConsistent: true),
-            alignment: self::alignment(statementCounts: $statementCounts, changedIndices: $changedIndices),
+            alignment: $alignment = self::alignment(statementCounts: $statementCounts, changedIndices: $changedIndices),
             baselineSampleCount: 30,
             candidateSampleCount: 30,
             baselineMedianWall: $baselineMedian,
@@ -390,6 +431,18 @@ final class MarkdownReportSnapshotTest extends TestCase
                 ? MedianShift::withoutInterval(estimatePct: $estimatePct, confidence: 0.95)
                 : new MedianShift(estimatePct: $estimatePct, lowerPct: $estimatePct - 2.0, upperPct: $estimatePct + 2.0, confidence: 0.95, resamples: 1000),
             unstableStatements: $unstableStatements,
+            planChanges: array_map(
+                fn (AlignedStatement $change, ?array $plans): StatementPlanComparison => new StatementPlanComparison(
+                    statement: $change,
+                    engine: $database->engine,
+                    // Without explicit plans, a present statement was simply
+                    // not explainable - every recorded statement has a plan.
+                    baseline: $plans[0] ?? ($change->baselineIndex === null ? null : new QueryPlan(capture: PlanCapture::Unsupported, raw: null, analysis: null)),
+                    candidate: $plans[1] ?? ($change->candidateIndex === null ? null : new QueryPlan(capture: PlanCapture::Unsupported, raw: null, analysis: null)),
+                ),
+                $alignment->changes(),
+                array_pad($planChanges, count($alignment->changes()), null),
+            ),
             blocks: BlockComparisonCollection::create($blocks),
         );
     }

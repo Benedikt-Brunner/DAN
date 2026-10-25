@@ -19,6 +19,7 @@ use Dan\Harness\Measurement\Result\LatencyDelta;
 use Dan\Harness\Measurement\Result\MedianShiftEstimator;
 use Dan\Harness\Measurement\Result\SampleCollection;
 use Dan\Harness\Measurement\Scheduling\RunSlot;
+use Dan\Harness\Plan\QueryPlan;
 use Dan\Harness\Protocol\DatabaseTarget;
 use Dan\Harness\Protocol\Engine;
 use Dan\Harness\Protocol\Protocol;
@@ -31,6 +32,7 @@ use Dan\Harness\RunStore\Artifact\StatementProfile;
 use Dan\Harness\RunStore\Artifact\StatementProfileCollection;
 use Dan\Harness\RunStore\Filesystem\RunDirectory;
 use Dan\Lib\Filesystem\Path;
+use Dan\Lib\Protocol\PlanCapture;
 use Dan\Lib\Protocol\ResultSet;
 use Dan\Lib\Protocol\ScenarioName;
 use Dan\Lib\Protocol\StatementDivergence;
@@ -214,6 +216,47 @@ final class RunComparatorTest extends TestCase
         self::assertSame(0.0, $cell->wallDeltaPct(), 'The pooled medians cancel out - exactly why the per-block view exists.');
     }
 
+    public function testChangedStatementsCarryTheirPlansThroughTheStore(): void
+    {
+        $baseline = $this->writeRun(slot: RunSlot::Baseline, wallNs: [
+            10_000_000,
+            10_000_000,
+            10_000_000,
+        ], sql: 'SELECT `id` FROM `product` WHERE `id` = ?', plan: new QueryPlan(capture: PlanCapture::Captured, raw: [
+            'query_block' => [
+                'table' => [
+                    'table_name' => 'product',
+                    'access_type' => 'const',
+                    'key' => 'PRIMARY',
+                    'rows_examined_per_scan' => 1,
+                ],
+            ],
+        ], analysis: '-> Rows fetched before execution  (cost=0..0 rows=1) (actual time=0.0002..0.0002 rows=1 loops=1)'));
+        $candidate = $this->writeRun(slot: RunSlot::Candidate, wallNs: [
+            10_000_000,
+            10_000_000,
+            10_000_000,
+        ], sql: 'SELECT `id` FROM `product` WHERE `product_number` = ?', plan: new QueryPlan(capture: PlanCapture::Captured, raw: [
+            'query_block' => [
+                'table' => [
+                    'table_name' => 'product',
+                    'access_type' => 'ALL',
+                    'rows_examined_per_scan' => 1000,
+                ],
+            ],
+        ], analysis: '-> Table scan on product  (cost=101 rows=1000) (actual time=0.03..0.21 rows=1000 loops=1)'));
+
+        $cell = RunComparator::compare(baseline: $baseline, candidate: $candidate)->cells[0];
+
+        self::assertCount(1, $cell->planChanges);
+        self::assertSame(0, $cell->planChanges[0]->statement->baselineIndex);
+        self::assertSame([
+            'product: access const -> ALL',
+            'product: index PRIMARY -> none',
+            'product: ~1 -> ~1000 rows',
+        ], $cell->planChanges[0]->materialChanges());
+    }
+
     public function testADifferentResultIsACorrectnessViolationWhateverTheLatency(): void
     {
         // Same SQL shape, candidate twice as fast - and returning one row
@@ -248,7 +291,7 @@ final class RunComparatorTest extends TestCase
      * @param list<int> $wallNs integer nanoseconds of the single block written when $blocks is empty
      * @param list<array{int, list<int>}> $blocks execution order plus wall samples per block, in block-index order
      */
-    private function writeRun(RunSlot $slot, array $wallNs, string $sql, array $blocks = [], ?ResultSet $resultSet = null): RunDirectory
+    private function writeRun(RunSlot $slot, array $wallNs, string $sql, array $blocks = [], ?ResultSet $resultSet = null, ?QueryPlan $plan = null): RunDirectory
     {
         $database = new DatabaseTarget(engine: Engine::MySql, version: '8.0');
         $protocol = new Protocol(
@@ -305,7 +348,7 @@ final class RunComparatorTest extends TestCase
                 resultSetConsistent: true,
                 wallSamples: SampleCollection::fromArray($blockWallNs),
                 statements: StatementProfileCollection::create([
-                    new StatementProfile(index: 0, sql: $sql, durationSamples: SampleCollection::fromArray($blockWallNs), observed: count($blockWallNs), divergence: StatementDivergence::None),
+                    new StatementProfile(index: 0, sql: $sql, durationSamples: SampleCollection::fromArray($blockWallNs), observed: count($blockWallNs), divergence: StatementDivergence::None, plan: $plan ?? new QueryPlan(capture: PlanCapture::Unsupported, raw: null, analysis: null)),
                 ]),
             );
         }

@@ -246,6 +246,11 @@ final class CellResultTest extends TestCase
                     ],
                     'observed' => 2,
                     'divergence' => 'none',
+                    'plan' => [
+                        'capture' => 'unsupported',
+                        'raw' => null,
+                        'analysis' => null,
+                    ],
                 ],
             ],
         ];

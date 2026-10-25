@@ -1,0 +1,75 @@
+{
+    "query_block": {
+        "select_id": 1,
+        "cost_info": {
+            "query_cost": "144.63"
+        },
+        "ordering_operation": {
+            "using_filesort": true,
+            "grouping_operation": {
+                "using_temporary_table": true,
+                "using_filesort": false,
+                "nested_loop": [
+                    {
+                        "table": {
+                            "table_name": "product",
+                            "access_type": "ALL",
+                            "possible_keys": [
+                                "PRIMARY"
+                            ],
+                            "rows_examined_per_scan": 1000,
+                            "rows_produced_per_join": 111,
+                            "filtered": "11.11",
+                            "cost_info": {
+                                "read_cost": "94.64",
+                                "eval_cost": "11.11",
+                                "prefix_cost": "105.75",
+                                "data_read_per_join": "34K"
+                            },
+                            "used_columns": [
+                                "id",
+                                "version_id",
+                                "product_number"
+                            ],
+                            "attached_condition": "(`dan`.`product`.`product_number` like 'SW1%')"
+                        }
+                    },
+                    {
+                        "table": {
+                            "table_name": "product_category",
+                            "access_type": "ref",
+                            "possible_keys": [
+                                "PRIMARY",
+                                "fk_category"
+                            ],
+                            "key": "PRIMARY",
+                            "used_key_parts": [
+                                "product_id"
+                            ],
+                            "key_length": "16",
+                            "ref": [
+                                "dan.product.id"
+                            ],
+                            "rows_examined_per_scan": 1,
+                            "rows_produced_per_join": 111,
+                            "filtered": "100.00",
+                            "using_index": true,
+                            "cost_info": {
+                                "read_cost": "27.78",
+                                "eval_cost": "11.11",
+                                "prefix_cost": "144.64",
+                                "data_read_per_join": "7K"
+                            },
+                            "used_columns": [
+                                "product_id",
+                                "product_version_id",
+                                "category_id",
+                                "category_version_id"
+                            ]
+                        }
+                    }
+                ]
+            }
+        }
+    }
+}

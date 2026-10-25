@@ -7,6 +7,7 @@ namespace Dan\Probe\Tests\Execution\Result;
 use Dan\Lib\Filesystem\AbsolutePath;
 use Dan\Lib\Protocol\ResultSet;
 use Dan\Lib\Protocol\StatementDivergence;
+use Dan\Probe\Execution\Result\CapturedPlan;
 use Dan\Probe\Execution\Result\ScenarioResult;
 use Dan\Probe\Execution\Result\ScenarioResultWriter;
 use Dan\Probe\Execution\Result\StatementResult;
@@ -38,6 +39,7 @@ final class ScenarioResultTest extends TestCase
                 ],
                 observed: 2,
                 divergence: StatementDivergence::Text,
+                plan: CapturedPlan::failed(),
             )],
         );
 
@@ -67,6 +69,11 @@ final class ScenarioResultTest extends TestCase
                     ],
                     'observed' => 2,
                     'divergence' => 'text',
+                    'plan' => [
+                        'capture' => 'failed',
+                        'raw' => null,
+                        'analysis' => null,
+                    ],
                 ],
             ],
         ], $result->toArray());
