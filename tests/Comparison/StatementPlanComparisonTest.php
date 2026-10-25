@@ -10,6 +10,7 @@ use Dan\Harness\Comparison\StatementPlanComparison;
 use Dan\Harness\Plan\QueryPlan;
 use Dan\Harness\Protocol\Engine;
 use Dan\Lib\Protocol\PlanCapture;
+use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 
 final class StatementPlanComparisonTest extends TestCase
@@ -58,6 +59,19 @@ final class StatementPlanComparisonTest extends TestCase
 
         self::assertSame('plan capture failed', $comparison->describeBaseline());
         self::assertSame([], $comparison->materialChanges());
+    }
+
+    public function testASideHasAPlanExactlyWhenItHasTheStatement(): void
+    {
+        // Every recorded statement carries a plan outcome; a missing plan for
+        // an existing statement would read as "no statement" in the report.
+        $this->expectException(InvalidArgumentException::class);
+        new StatementPlanComparison(
+            statement: new AlignedStatement(kind: AlignmentKind::Modified, baselineIndex: 0, candidateIndex: 0),
+            engine: Engine::MySql,
+            baseline: null,
+            candidate: self::plan(accessType: 'ALL', key: null, rows: 1000),
+        );
     }
 
     private static function plan(string $accessType, ?string $key, int $rows): QueryPlan

@@ -30,7 +30,7 @@ Captured after timing, bound to the parameter values the DAL used. The plan colu
 
 | Cell | Statement | Baseline plan | Candidate plan | Material changes |
 |---|---|---|---|---|
-| product.keyword-listing / S / mysql-8.0 | ~0 | no statement | no statement | n/a |
+| product.keyword-listing / S / mysql-8.0 | ~0 | not explainable | not explainable | n/a |
 
 ## Block diagnostics
 

@@ -44,6 +44,18 @@ final class QueryPlan
     }
 
     /**
+     * @param QueryPlanPayload $payload
+     */
+    public static function fromArray(array $payload): self
+    {
+        return new self(
+            capture: PlanCapture::tryFrom($payload['capture']) ?? throw new RuntimeException(sprintf('Malformed query plan: unknown capture outcome "%s".', $payload['capture'])),
+            raw: $payload['raw'],
+            analysis: $payload['analysis'],
+        );
+    }
+
+    /**
      * @param array<mixed> $payload
      */
     public static function fromDecodedArray(array $payload): self
@@ -55,10 +67,10 @@ final class QueryPlan
             throw new RuntimeException('Malformed query plan payload.');
         }
 
-        return new self(
-            capture: PlanCapture::tryFrom($capture) ?? throw new RuntimeException(sprintf('Malformed query plan: unknown capture outcome "%s".', $capture)),
-            raw: $raw,
-            analysis: $analysis,
-        );
+        return self::fromArray([
+            'capture' => $capture,
+            'raw' => $raw,
+            'analysis' => $analysis,
+        ]);
     }
 }

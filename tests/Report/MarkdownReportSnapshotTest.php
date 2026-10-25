@@ -435,8 +435,10 @@ final class MarkdownReportSnapshotTest extends TestCase
                 fn (AlignedStatement $change, ?array $plans): StatementPlanComparison => new StatementPlanComparison(
                     statement: $change,
                     engine: $database->engine,
-                    baseline: $plans[0] ?? null,
-                    candidate: $plans[1] ?? null,
+                    // Without explicit plans, a present statement was simply
+                    // not explainable - every recorded statement has a plan.
+                    baseline: $plans[0] ?? ($change->baselineIndex === null ? null : new QueryPlan(capture: PlanCapture::Unsupported, raw: null, analysis: null)),
+                    candidate: $plans[1] ?? ($change->candidateIndex === null ? null : new QueryPlan(capture: PlanCapture::Unsupported, raw: null, analysis: null)),
                 ),
                 $alignment->changes(),
                 array_pad($planChanges, count($alignment->changes()), null),

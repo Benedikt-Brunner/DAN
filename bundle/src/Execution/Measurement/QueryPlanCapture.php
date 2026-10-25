@@ -51,17 +51,23 @@ final readonly class QueryPlanCapture
         }
 
         // The DAL binds positional parameters as a list and named ones by
-        // name; both are what the engine expects to plan against.
+        // name, each with its binding type; both are what the engine expects
+        // to plan against - a value rebound as a string can plan differently
+        // or not parse at all (LIMIT '10').
         $params = [];
+        $types = [];
         foreach ($statement->params ?? [] as $key => $value) {
             if (is_string($key) || $key >= 0) {
                 $params[$key] = $value;
+                if (isset($statement->types[$key])) {
+                    $types[$key] = $statement->types[$key];
+                }
             }
         }
 
         try {
-            $rawPlan = $this->connection->fetchOne('EXPLAIN FORMAT=JSON ' . $statement->sql, $params);
-            $rawAnalysis = $this->connection->fetchOne($dialect->analyze($statement->sql), $params);
+            $rawPlan = $this->connection->fetchOne('EXPLAIN FORMAT=JSON ' . $statement->sql, $params, $types);
+            $rawAnalysis = $this->connection->fetchOne($dialect->analyze($statement->sql), $params, $types);
         } catch (Throwable) {
             return CapturedPlan::failed();
         }
@@ -88,20 +94,34 @@ final readonly class QueryPlanCapture
     }
 
     /**
+     * Engines print constant values verbatim inside plans, which makes
+     * MariaDB's output invalid JSON in two ways. A binary parameter bound as a
+     * string arrives as raw bytes: every control byte - tab, LF and CR
+     * included, which JSON forbids inside strings just the same - becomes a
+     * space, which JSON accepts both between tokens and inside strings. Bound
+     * as binary it arrives as _binary'...' with \xBB escapes JSON does not
+     * know: a backslash that starts no JSON escape is escaped itself. The
+     * plan structure survives either way.
+     *
      * @return array<mixed>|null
      */
     public static function decodePlan(string $raw): ?array
     {
-        $decoded = json_decode(self::sanitize($raw), true);
+        $escaped = preg_replace_callback(
+            '/\\\\(.)/s',
+            fn (array $escape): string => str_contains('"\\/bfnrtu', $escape[1]) ? $escape[0] : '\\\\' . $escape[1],
+            (string) preg_replace('/[\x00-\x1F]/', ' ', $raw),
+        );
+        $decoded = json_decode(self::sanitize((string) $escaped), true);
 
         return is_array($decoded) ? $decoded : null;
     }
 
     /**
-     * Engines print constant values verbatim inside plans: MariaDB embeds
-     * binary parameters (UUIDs) as raw bytes, which makes its output invalid
-     * JSON and invalid UTF-8. Control characters and invalid byte sequences
-     * are replaced; the plan itself - what anyone reads - survives.
+     * The same verbatim constants make the output invalid UTF-8, which no
+     * JSON protocol can carry. Control characters other than tab and line
+     * breaks - the layout of MySQL's tree - and invalid byte sequences are
+     * replaced; the text itself survives.
      */
     public static function sanitize(string $raw): string
     {

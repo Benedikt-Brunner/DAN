@@ -99,18 +99,20 @@ final class PlanFacts
     public function materialChangesTo(self $other): array
     {
         $changes = [];
+        // A table can appear more than once (the same unaliased table in
+        // several query blocks of a UNION); occurrences pair up in plan order.
+        /** @var array<string, list<TableAccess>> $otherTables */
         $otherTables = [];
         foreach ($other->tables as $access) {
-            $otherTables[$access->table] = $access;
+            $otherTables[$access->table][] = $access;
         }
         foreach ($this->tables as $access) {
-            $theirs = $otherTables[$access->table] ?? null;
+            $theirs = isset($otherTables[$access->table]) ? array_shift($otherTables[$access->table]) : null;
             if ($theirs === null) {
                 $changes[] = sprintf('table %s no longer accessed', $access->table);
 
                 continue;
             }
-            unset($otherTables[$access->table]);
             if ($access->accessType !== $theirs->accessType) {
                 $changes[] = sprintf('%s: access %s -> %s', $access->table, $access->accessType, $theirs->accessType);
             }
@@ -121,8 +123,10 @@ final class PlanFacts
                 $changes[] = sprintf('%s: ~%s -> ~%s rows', $access->table, $access->estimatedRows ?? '?', $theirs->estimatedRows ?? '?');
             }
         }
-        foreach ($otherTables as $access) {
-            $changes[] = sprintf('table %s newly accessed', $access->table);
+        foreach ($otherTables as $accesses) {
+            foreach ($accesses as $access) {
+                $changes[] = sprintf('table %s newly accessed', $access->table);
+            }
         }
         if ($this->usesTemporaryTable !== $other->usesTemporaryTable) {
             $changes[] = $other->usesTemporaryTable ? 'temporary table introduced' : 'temporary table gone';

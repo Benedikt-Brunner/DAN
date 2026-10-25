@@ -74,12 +74,25 @@ final class QueryPlanCaptureTest extends TestCase
         ]], $plan);
     }
 
-    public function testSanitizesBinaryConstantsMariaDbEmbedsVerbatim(): void
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function binaryConstants(): iterable
+    {
+        yield 'control and invalid UTF-8 bytes' => ["\x0f\xa9\x1c\xe3\xe9jK\xc2\xbeK\xd9\xceu,4%"];
+        yield 'tab, line feed and carriage return' => ["\x0f\x09\xa9\x0a\x1c\x0d\xe3jK"];
+        // Bound as binary, MariaDB prints the literal with \xNN escapes.
+        yield 'escaped binary literal' => ['_binary\'/\\xBB_\\xE2\\xE2\\x9AMp\\xAAXT\\xCE|\\xE3\\xE2\\x0B'];
+    }
+
+    #[DataProvider('binaryConstants')]
+    public function testSanitizesBinaryConstantsMariaDbEmbedsVerbatim(string $constant): void
     {
         // A UUID bound as BINARY(16) shows up as raw bytes inside the
         // attached_condition string - control characters and invalid UTF-8
-        // that no JSON decoder accepts.
-        $raw = "{\"query_block\": {\"select_id\": 1, \"table\": {\"table_name\": \"product\", \"attached_condition\": \"product.version_id = '\x0f\xa9\x1c\xe3\xe9jK\xc2\xbeK\xd9\xceu,4%'\"}}}";
+        // that no JSON decoder accepts. The plan around it is pretty-printed,
+        // so its own line breaks must keep working as JSON whitespace.
+        $raw = "{\n\t\"query_block\": {\"select_id\": 1, \"table\": {\"table_name\": \"product\", \"attached_condition\": \"product.version_id = '" . $constant . "'\"}}\r\n}";
 
         $plan = QueryPlanCapture::decodePlan($raw);
 
@@ -102,6 +115,16 @@ final class QueryPlanCaptureTest extends TestCase
         self::assertStringStartsWith("-> Filter: (p.version_id = '?", $analysis);
         self::assertStringEndsWith("jK')  (actual time=0.03..0.04 rows=3 loops=1)", $analysis);
         self::assertNotFalse(json_encode($analysis));
+    }
+
+    public function testKeepsValidJsonEscapesIntact(): void
+    {
+        $plan = QueryPlanCapture::decodePlan('{"sort_key": "`a`.`b`", "attached_condition": "x = \'a\\\\xb\\"c\\u00e9\\n\'"}');
+
+        self::assertSame([
+            'sort_key' => '`a`.`b`',
+            'attached_condition' => "x = 'a\\xb\"c\u{e9}\n'",
+        ], $plan);
     }
 
     public function testUndecodableOutputIsNoPlan(): void

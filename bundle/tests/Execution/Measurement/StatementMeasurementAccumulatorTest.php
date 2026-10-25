@@ -92,6 +92,6 @@ final class StatementMeasurementAccumulatorTest extends TestCase
 
     private static function statement(string $sql, int $ns): RecordedStatement
     {
-        return new RecordedStatement(sql: $sql, params: null, duration: Duration::fromNs($ns));
+        return new RecordedStatement(sql: $sql, params: null, types: null, duration: Duration::fromNs($ns));
     }
 }

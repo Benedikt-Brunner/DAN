@@ -106,7 +106,7 @@ final class StatementProfile
             durationSamples: SampleCollection::fromArray($payload['durationsNsSamples']),
             observed: $payload['observed'],
             divergence: StatementDivergence::tryFrom($payload['divergence']) ?? throw new RuntimeException(sprintf('Malformed statement profile: unknown divergence "%s".', $payload['divergence'])),
-            plan: QueryPlan::fromDecodedArray($payload['plan']),
+            plan: QueryPlan::fromArray($payload['plan']),
         );
     }
 
