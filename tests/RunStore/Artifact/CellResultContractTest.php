@@ -30,7 +30,7 @@ final class CellResultContractTest extends TestCase
             payload: self::fixture(),
             tier: Tier::S,
             database: new DatabaseTarget(engine: Engine::MySql, version: '8.0'),
-            block: new MeasurementBlock(slot: RunSlot::Candidate, warmupIterations: 1, iterations: 3, blockIndex: 2, executionOrder: 5, capturePlans: true),
+            block: new MeasurementBlock(slot: RunSlot::Candidate, warmupIterations: 1, iterations: 3, blockIndex: 2, executionOrder: 5),
         );
 
         self::assertSame('product.deep-read', $cell->scenario->toString());
@@ -62,7 +62,7 @@ final class CellResultContractTest extends TestCase
         ], $statements[0]->durationSamples->toNsArray());
         self::assertSame(3, $statements[0]->observed);
         self::assertSame(StatementDivergence::None, $statements[0]->divergence);
-        self::assertSame(PlanCapture::Captured, $statements[0]->plan?->capture);
+        self::assertSame(PlanCapture::Captured, $statements[0]->plan->capture);
         self::assertSame([
             'query_block' => [
                 'select_id' => 1,
@@ -74,6 +74,7 @@ final class CellResultContractTest extends TestCase
                 ],
             ],
         ], $statements[0]->plan->raw);
+        self::assertSame("-> Filter: (`product`.id in (?,?,?))  (cost=1.86 rows=3) (actual time=0.0213..0.0301 rows=2 loops=1)\n    -> Covering index range scan on product using PRIMARY over (id = ?) OR (id = ?) OR (id = ?)  (cost=1.86 rows=3) (actual time=0.0198..0.0279 rows=2 loops=1)\n", $statements[0]->plan->analysis);
         self::assertSame(1, $statements[1]->index);
         self::assertSame('SELECT `category`.`id`, `category`.`name` FROM `category` WHERE `category`.`id` = ?', $statements[1]->sql);
         self::assertSame([
@@ -83,8 +84,9 @@ final class CellResultContractTest extends TestCase
         ], $statements[1]->durationSamples->toNsArray());
         self::assertSame(2, $statements[1]->observed);
         self::assertSame(StatementDivergence::TextAndPresence, $statements[1]->divergence);
-        self::assertSame(PlanCapture::Unsupported, $statements[1]->plan?->capture);
+        self::assertSame(PlanCapture::Unsupported, $statements[1]->plan->capture);
         self::assertNull($statements[1]->plan->raw);
+        self::assertNull($statements[1]->plan->analysis);
     }
 
     /**

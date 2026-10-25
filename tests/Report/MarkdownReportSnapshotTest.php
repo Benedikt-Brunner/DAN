@@ -141,7 +141,7 @@ final class MarkdownReportSnapshotTest extends TestCase
                 ],
                 [
                     null,
-                    new QueryPlan(capture: PlanCapture::Unsupported, raw: null),
+                    new QueryPlan(capture: PlanCapture::Unsupported, raw: null, analysis: null),
                 ],
             ]),
             self::cell(scenario: 'synthetic.json-path', tier: Tier::S, database: $mysql, medianMs: [
@@ -303,7 +303,7 @@ final class MarkdownReportSnapshotTest extends TestCase
                     'table' => $table,
                 ],
             ],
-        ]);
+        ], analysis: sprintf("-> Sort: `product`.`name`  (actual time=0.41..0.42 rows=%d loops=1)\n    -> %s on product  (cost=1.2 rows=%d) (actual time=0.02..0.31 rows=%d loops=1)\n", $rows, $accessType, $rows, $rows));
     }
 
     /**
@@ -443,8 +443,10 @@ final class MarkdownReportSnapshotTest extends TestCase
                 fn (AlignedStatement $change, ?array $plans): StatementPlanComparison => new StatementPlanComparison(
                     statement: $change,
                     engine: $database->engine,
-                    baseline: $plans[0] ?? null,
-                    candidate: $plans[1] ?? null,
+                    // Without explicit plans, a present statement was simply
+                    // not explainable - every recorded statement has a plan.
+                    baseline: $plans[0] ?? ($change->baselineIndex === null ? null : new QueryPlan(capture: PlanCapture::Unsupported, raw: null, analysis: null)),
+                    candidate: $plans[1] ?? ($change->candidateIndex === null ? null : new QueryPlan(capture: PlanCapture::Unsupported, raw: null, analysis: null)),
                 ),
                 $alignment->changes(),
                 array_pad($planChanges, count($alignment->changes()), null),

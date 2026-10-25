@@ -34,6 +34,23 @@ final class MarkdownBuilder
         return $this->line('| ' . implode(' | ', $cells) . ' |');
     }
 
+    /**
+     * A fenced block of verbatim text. The fence outgrows any backtick run
+     * inside the content, so engine output (MySQL quotes identifiers in
+     * backticks) can never close it early.
+     */
+    public function codeBlock(string $content): self
+    {
+        preg_match_all('/`+/', $content, $runs);
+        $longestRun = 2;
+        foreach ($runs[0] as $run) {
+            $longestRun = max($longestRun, strlen($run));
+        }
+        $fence = str_repeat('`', $longestRun + 1);
+
+        return $this->line($fence)->line(rtrim($content, "\n"))->line($fence);
+    }
+
     public function build(): string
     {
         return implode("\n", $this->lines);

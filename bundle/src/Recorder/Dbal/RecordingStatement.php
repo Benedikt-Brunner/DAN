@@ -15,6 +15,9 @@ final class RecordingStatement extends AbstractStatementMiddleware
     /** @var array<int|string, mixed> */
     private array $params = [];
 
+    /** @var array<int|string, int> */
+    private array $types = [];
+
     public function __construct(
         Statement $statement,
         private readonly QueryRecorder $recorder,
@@ -26,6 +29,7 @@ final class RecordingStatement extends AbstractStatementMiddleware
     public function bindValue($param, $value, $type = ParameterType::STRING)
     {
         $this->params[$param] = $value;
+        $this->types[$param] = $type;
 
         return parent::bindValue($param, $value, $type);
     }
@@ -33,6 +37,7 @@ final class RecordingStatement extends AbstractStatementMiddleware
     public function bindParam($param, &$variable, $type = ParameterType::STRING, $length = null)
     {
         $this->params[$param] = &$variable;
+        $this->types[$param] = $type;
 
         return parent::bindParam($param, $variable, $type, $length);
     }
@@ -41,6 +46,9 @@ final class RecordingStatement extends AbstractStatementMiddleware
     public function execute($params = null): Result
     {
         $recordedParams = $this->normalizeParams($params ?? $this->params);
+        // Values passed to execute() directly carry no types: the driver
+        // binds them all as strings, and so would a replay without types.
+        $recordedTypes = $params === null ? $this->normalizeParams($this->types) : null;
         $startedAt = $this->recorder->startStatement();
 
         try {
@@ -49,6 +57,7 @@ final class RecordingStatement extends AbstractStatementMiddleware
             $this->recorder->finishStatement(
                 sql: $this->sql,
                 params: $recordedParams,
+                types: $recordedTypes,
                 startedAt: $startedAt,
             );
         }
@@ -56,11 +65,14 @@ final class RecordingStatement extends AbstractStatementMiddleware
 
     /**
      * DBAL binds positional parameters to the driver using 1-based indexes.
-     * Keep their recorded representation compatible with the caller's list.
+     * Keep their recorded representation compatible with the caller's list;
+     * values and types are bound together, so both stay aligned.
      *
-     * @param array<mixed> $params
+     * @template T
      *
-     * @return array<mixed>
+     * @param array<T> $params
+     *
+     * @return array<T>
      */
     private function normalizeParams(array $params): array
     {

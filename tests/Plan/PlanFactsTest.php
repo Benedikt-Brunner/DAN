@@ -112,6 +112,29 @@ final class PlanFactsTest extends TestCase
         self::assertSame(['product: ~100 -> ~200 rows'], $a->materialChangesTo($c));
     }
 
+    public function testRepeatedTablesPairUpInPlanOrder(): void
+    {
+        // The same unaliased table in both halves of a UNION: two accesses
+        // under one name, each compared with its counterpart.
+        $union = new PlanFacts(tables: [
+            new TableAccess(table: 'product', accessType: 'ref', key: 'idx_stock', estimatedRows: 10),
+            new TableAccess(table: 'product', accessType: 'const', key: 'PRIMARY', estimatedRows: 1),
+        ], usesTemporaryTable: true, usesFilesort: false);
+        $firstHalfScans = new PlanFacts(tables: [
+            new TableAccess(table: 'product', accessType: 'ALL', key: null, estimatedRows: 10),
+            new TableAccess(table: 'product', accessType: 'const', key: 'PRIMARY', estimatedRows: 1),
+        ], usesTemporaryTable: true, usesFilesort: false);
+        $oneHalfOnly = new PlanFacts(tables: [new TableAccess(table: 'product', accessType: 'ref', key: 'idx_stock', estimatedRows: 10)], usesTemporaryTable: true, usesFilesort: false);
+
+        self::assertSame([], $union->materialChangesTo($union));
+        self::assertSame([
+            'product: access ref -> ALL',
+            'product: index idx_stock -> none',
+        ], $union->materialChangesTo($firstHalfScans));
+        self::assertSame(['table product no longer accessed'], $union->materialChangesTo($oneHalfOnly));
+        self::assertSame(['table product newly accessed'], $oneHalfOnly->materialChangesTo($union));
+    }
+
     public function testDescribesAPlanWithoutTablesHonestly(): void
     {
         self::assertSame('no table access', PlanFacts::fromMySql(['query_block' => ['select_id' => 1]])->describe());

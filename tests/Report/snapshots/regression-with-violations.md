@@ -26,11 +26,11 @@ Delta: estimated median shift with its 95% bootstrap interval. \* p95 from fewer
 
 ## Query plans of changed statements
 
-Captured with `EXPLAIN FORMAT=JSON` after timing, bound to the parameter values the DAL used. Row counts are the optimizer's estimates.
+Captured after timing, bound to the parameter values the DAL used. The plan columns read the optimizer's estimated plan (`EXPLAIN FORMAT=JSON`), so their row counts are estimates; what each plan actually did on one more execution (`EXPLAIN ANALYZE`) follows the table as the engine printed it.
 
-| Cell | Statement | Plan A | Plan B | Material changes |
+| Cell | Statement | Baseline plan | Candidate plan | Material changes |
 |---|---|---|---|---|
-| product.keyword-listing / S / mysql-8.0 | ~0 | no statement | no statement | n/a |
+| product.keyword-listing / S / mysql-8.0 | ~0 | not explainable | not explainable | n/a |
 
 ## Block diagnostics
 

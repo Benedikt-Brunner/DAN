@@ -7,7 +7,6 @@ namespace Dan\Probe\Execution\Measurement;
 use Composer\InstalledVersions;
 use Dan\Lib\Protocol\ResultSet;
 use Dan\Lib\Time\Timestamp;
-use Dan\Probe\Execution\Result\CapturedPlan;
 use Dan\Probe\Execution\Result\ScenarioResult;
 use Dan\Probe\Recorder\QueryRecorder;
 use Dan\Probe\Recorder\RecordedStatement;
@@ -28,16 +27,11 @@ final readonly class ScenarioMeasurer
         private QueryPlanCapture $planCapture,
     ) {}
 
-    /**
-     * @param bool $capturePlans explain every recorded statement after timing;
-     *                           the harness asks for it once per cell
-     */
     public function measure(
         Scenario $scenario,
         Context $context,
         int $warmup,
         int $iterations,
-        bool $capturePlans,
     ): ScenarioResult {
         $repository = $this->definitionRegistry->getRepository($scenario->entity());
         $this->recorder->start();
@@ -52,8 +46,8 @@ final readonly class ScenarioMeasurer
             /** @var array<int, StatementMeasurementAccumulator> $statements */
             $statements = [];
             $resultSets = new ResultSetAccumulator();
-            /** @var list<RecordedStatement> $lastIteration */
-            $lastIteration = [];
+            /** @var array<int, RecordedStatement> $lastRecorded */
+            $lastRecorded = [];
             for ($iteration = 0; $iteration < $iterations; ++$iteration) {
                 $this->recorder->drain();
                 $startedAt = Timestamp::now();
@@ -63,29 +57,24 @@ final readonly class ScenarioMeasurer
                 // bookkeeping, not the DAL's work.
                 $resultSets->observe(new ResultSet(ids: array_values($searchResult->getIds()), total: $searchResult->getTotal()));
 
-                $lastIteration = $this->recorder->drain();
-                foreach ($lastIteration as $index => $recordedStatement) {
+                foreach ($this->recorder->drain() as $index => $recordedStatement) {
                     $statements[$index] ??= new StatementMeasurementAccumulator(
                         index: $index,
                         sql: $recordedStatement->sql,
                     );
                     $statements[$index]->record($recordedStatement);
+                    $lastRecorded[$index] = $recordedStatement;
                 }
             }
         } finally {
             $this->recorder->stop();
         }
 
-        // Plans come after timing, with the recorder stopped, so EXPLAIN
-        // never shows up in the samples. Bound to the last iteration's
-        // parameter values, the ones the engine actually planned for.
-        /** @var array<int, CapturedPlan> $plans */
-        $plans = [];
-        if ($capturePlans) {
-            foreach ($lastIteration as $index => $recordedStatement) {
-                $plans[$index] = $this->planCapture->capture($recordedStatement);
-            }
-        }
+        // Plans come after timing, with the recorder stopped, so neither
+        // EXPLAIN nor the extra execution ANALYZE performs ever shows up in
+        // the samples. Each position is bound to the parameter values of its
+        // last recorded execution, the ones the engine actually planned for.
+        $plans = $this->planCapture->captureAll($lastRecorded);
 
         return new ScenarioResult(
             scenario: $scenario->name(),
@@ -99,7 +88,7 @@ final readonly class ScenarioMeasurer
             resultSetConsistent: $resultSets->consistent(),
             wallSamplesNs: $wallSamplesNs,
             statements: array_map(
-                fn (int $index, StatementMeasurementAccumulator $statement) => $statement->result(iterations: $iterations, plan: $plans[$index] ?? null),
+                fn (int $index, StatementMeasurementAccumulator $statement) => $statement->result(iterations: $iterations, plan: $plans[$index]),
                 array_keys($statements),
                 array_values($statements),
             ),

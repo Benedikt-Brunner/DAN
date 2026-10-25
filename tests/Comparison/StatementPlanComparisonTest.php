@@ -10,6 +10,7 @@ use Dan\Harness\Comparison\StatementPlanComparison;
 use Dan\Harness\Plan\QueryPlan;
 use Dan\Harness\Protocol\Engine;
 use Dan\Lib\Protocol\PlanCapture;
+use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 
 final class StatementPlanComparisonTest extends TestCase
@@ -38,7 +39,7 @@ final class StatementPlanComparisonTest extends TestCase
             statement: new AlignedStatement(kind: AlignmentKind::Inserted, baselineIndex: null, candidateIndex: 4),
             engine: Engine::MariaDb,
             baseline: null,
-            candidate: new QueryPlan(capture: PlanCapture::Unsupported, raw: null),
+            candidate: new QueryPlan(capture: PlanCapture::Unsupported, raw: null, analysis: null),
         );
 
         self::assertSame('no statement', $inserted->describeBaseline());
@@ -52,12 +53,25 @@ final class StatementPlanComparisonTest extends TestCase
         $comparison = new StatementPlanComparison(
             statement: new AlignedStatement(kind: AlignmentKind::Removed, baselineIndex: 2, candidateIndex: null),
             engine: Engine::MySql,
-            baseline: new QueryPlan(capture: PlanCapture::Failed, raw: null),
+            baseline: new QueryPlan(capture: PlanCapture::Failed, raw: null, analysis: null),
             candidate: null,
         );
 
         self::assertSame('plan capture failed', $comparison->describeBaseline());
         self::assertSame([], $comparison->materialChanges());
+    }
+
+    public function testASideHasAPlanExactlyWhenItHasTheStatement(): void
+    {
+        // Every recorded statement carries a plan outcome; a missing plan for
+        // an existing statement would read as "no statement" in the report.
+        $this->expectException(InvalidArgumentException::class);
+        new StatementPlanComparison(
+            statement: new AlignedStatement(kind: AlignmentKind::Modified, baselineIndex: 0, candidateIndex: 0),
+            engine: Engine::MySql,
+            baseline: null,
+            candidate: self::plan(accessType: 'ALL', key: null, rows: 1000),
+        );
     }
 
     private static function plan(string $accessType, ?string $key, int $rows): QueryPlan
@@ -76,6 +90,6 @@ final class StatementPlanComparisonTest extends TestCase
                 'select_id' => 1,
                 'table' => $table,
             ],
-        ]);
+        ], analysis: sprintf('-> %s on product  (actual time=0.01..0.02 rows=%d loops=1)', $accessType, $rows));
     }
 }

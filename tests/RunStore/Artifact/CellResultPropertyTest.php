@@ -260,6 +260,7 @@ final class CellResultPropertyTest extends PropertyTestCase
             $payload['blocks'][0]['statements'][0]['plan'] = [
                 'capture' => 'maybe',
                 'raw' => null,
+                'analysis' => null,
             ];
 
             try {
@@ -274,15 +275,14 @@ final class CellResultPropertyTest extends PropertyTestCase
         });
     }
 
-    public function testPooledStatementsKeepTheFirstCapturedPlan(): void
+    public function testPooledStatementsKeepTheEarliestBlocksPlan(): void
     {
+        // Every block captures plans; the pooled view must take the one
+        // measured first in the session, whatever order blocks merged in.
         $this->forAll(DomainGenerators::cellResult())->then(function (CellResult $cell): void {
+            $earliest = $cell->blocks->getItems()[0];
             foreach ($cell->statements() as $index => $statement) {
-                $expected = null;
-                foreach ($cell->blocks as $block) {
-                    $expected ??= $block->statements[$index]->plan;
-                }
-                self::assertSame($expected?->toArray(), $statement->plan?->toArray());
+                self::assertSame($earliest->statements[$index]->plan->toArray(), $statement->plan->toArray());
             }
         });
     }
@@ -511,6 +511,27 @@ final class CellResultPropertyTest extends PropertyTestCase
                     'plan',
                 ],
                 'yes',
+            ],
+            [
+                [
+                    'blocks',
+                    0,
+                    'statements',
+                    0,
+                    'plan',
+                ],
+                null,
+            ],
+            [
+                [
+                    'blocks',
+                    0,
+                    'statements',
+                    0,
+                    'plan',
+                    'analysis',
+                ],
+                42,
             ],
         ];
 

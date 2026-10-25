@@ -234,7 +234,7 @@ final class RunComparatorTest extends TestCase
                     'rows_examined_per_scan' => 1,
                 ],
             ],
-        ]));
+        ], analysis: '-> Rows fetched before execution  (cost=0..0 rows=1) (actual time=0.0002..0.0002 rows=1 loops=1)'));
         $candidate = $this->writeRun(slot: RunSlot::Candidate, wallNs: [
             10_000_000,
             10_000_000,
@@ -247,7 +247,7 @@ final class RunComparatorTest extends TestCase
                     'rows_examined_per_scan' => 1000,
                 ],
             ],
-        ]));
+        ], analysis: '-> Table scan on product  (cost=101 rows=1000) (actual time=0.03..0.21 rows=1000 loops=1)'));
 
         $cell = RunComparator::compare(baseline: $baseline, candidate: $candidate)->cells[0];
 
@@ -383,7 +383,7 @@ final class RunComparatorTest extends TestCase
                 resultSetConsistent: true,
                 wallSamples: SampleCollection::fromArray($blockWallNs),
                 statements: StatementProfileCollection::create([
-                    new StatementProfile(index: 0, sql: $sql, durationSamples: SampleCollection::fromArray($blockWallNs), observed: count($blockWallNs), divergence: StatementDivergence::None, plan: $plan),
+                    new StatementProfile(index: 0, sql: $sql, durationSamples: SampleCollection::fromArray($blockWallNs), observed: count($blockWallNs), divergence: StatementDivergence::None, plan: $plan ?? new QueryPlan(capture: PlanCapture::Unsupported, raw: null, analysis: null)),
                 ]),
             );
         }

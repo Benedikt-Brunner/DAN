@@ -41,9 +41,9 @@ final class StatementMeasurementAccumulator
     /**
      * @param int $iterations the measured iterations of the scenario; a position
      *                        observed in fewer of them is intermittent
-     * @param CapturedPlan|null $plan the position's query plan, when plans were captured
+     * @param CapturedPlan $plan the position's query plan, captured after timing
      */
-    public function result(int $iterations, ?CapturedPlan $plan): StatementResult
+    public function result(int $iterations, CapturedPlan $plan): StatementResult
     {
         return new StatementResult(
             index: $this->index,

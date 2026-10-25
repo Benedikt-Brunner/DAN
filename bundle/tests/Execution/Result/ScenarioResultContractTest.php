@@ -21,6 +21,12 @@ use RuntimeException;
  */
 final class ScenarioResultContractTest extends TestCase
 {
+    private const ANALYSIS = <<<'TREE'
+        -> Filter: (`product`.id in (?,?,?))  (cost=1.86 rows=3) (actual time=0.0213..0.0301 rows=2 loops=1)
+            -> Covering index range scan on product using PRIMARY over (id = ?) OR (id = ?) OR (id = ?)  (cost=1.86 rows=3) (actual time=0.0198..0.0279 rows=2 loops=1)
+
+        TREE;
+
     public function testScenarioResultSerializesExactlyToTheContractFixture(): void
     {
         $result = new ScenarioResult(
@@ -60,7 +66,7 @@ final class ScenarioResultContractTest extends TestCase
                                 'rows_examined_per_scan' => 3,
                             ],
                         ],
-                    ]),
+                    ], analysis: self::ANALYSIS),
                 ),
                 new StatementResult(
                     index: 1,

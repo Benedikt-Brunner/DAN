@@ -33,7 +33,7 @@ final class RecordingConnection extends AbstractConnectionMiddleware
         try {
             return parent::query($sql);
         } finally {
-            $this->recorder->finishStatement(sql: $sql, params: null, startedAt: $startedAt);
+            $this->recorder->finishStatement(sql: $sql, params: null, types: null, startedAt: $startedAt);
         }
     }
 
@@ -44,7 +44,7 @@ final class RecordingConnection extends AbstractConnectionMiddleware
         try {
             return parent::exec($sql);
         } finally {
-            $this->recorder->finishStatement(sql: $sql, params: null, startedAt: $startedAt);
+            $this->recorder->finishStatement(sql: $sql, params: null, types: null, startedAt: $startedAt);
         }
     }
 }

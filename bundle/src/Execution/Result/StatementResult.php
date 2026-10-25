@@ -7,8 +7,8 @@ namespace Dan\Probe\Execution\Result;
 use Dan\Lib\Protocol\StatementDivergence;
 
 /**
- * The immutable result for one statement position across measured iterations.
- * The plan is null when this invocation was not asked to capture plans.
+ * The immutable result for one statement position across measured iterations,
+ * with the plan the engine chose for it after timing.
  */
 final readonly class StatementResult
 {
@@ -19,7 +19,7 @@ final readonly class StatementResult
         private array $durationSamplesNs,
         private int $observed,
         private StatementDivergence $divergence,
-        private ?CapturedPlan $plan,
+        private CapturedPlan $plan,
     ) {}
 
     /**
@@ -29,7 +29,7 @@ final readonly class StatementResult
      *     durationsNsSamples: list<int>,
      *     observed: int,
      *     divergence: string,
-     *     plan: array{capture: string, raw: array<mixed>|null}|null
+     *     plan: array{capture: string, raw: array<mixed>|null, analysis: string|null}
      * }
      */
     public function toArray(): array
@@ -40,7 +40,7 @@ final readonly class StatementResult
             'durationsNsSamples' => $this->durationSamplesNs,
             'observed' => $this->observed,
             'divergence' => $this->divergence->value,
-            'plan' => $this->plan?->toArray(),
+            'plan' => $this->plan->toArray(),
         ];
     }
 }
