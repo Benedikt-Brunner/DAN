@@ -29,10 +29,10 @@ final readonly class ScenarioMeasurer
 
     public function measure(
         Scenario $scenario,
-        Context $context,
         int $warmup,
         int $iterations,
     ): ScenarioResult {
+        $context = self::contextFor($scenario);
         $repository = $this->definitionRegistry->getRepository($scenario->entity());
         $this->recorder->start();
 
@@ -93,5 +93,17 @@ final readonly class ScenarioMeasurer
                 array_values($statements),
             ),
         );
+    }
+
+    /**
+     * The scenario decides whether inheritance is considered; everything
+     * else is the default system context.
+     */
+    public static function contextFor(Scenario $scenario): Context
+    {
+        $context = Context::createDefaultContext();
+        $context->setConsiderInheritance($scenario->considerInheritance());
+
+        return $context;
     }
 }

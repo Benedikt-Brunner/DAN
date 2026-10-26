@@ -40,6 +40,10 @@ bin/dan diff runs/<session>/baseline runs/<session>/candidate --out report.md
 
 A/B runs write `runs/<session>/report.md` (PR-comment-ready markdown) and exit non-zero on gate violations (`--max-regression`, default 15%; `--fail-on-sql-change` opt-in). The latency gate decides over the two sample distributions, not two medians: a cell violates only when the bootstrap interval of the median shift excludes zero *and* the estimated shift exceeds the threshold. The report prints the estimate with its interval, and marks p95 values from fewer than 100 samples as indicative.
 
+## Corpus
+
+The built-in scenarios are organised along general DAL dimensions — result cardinality, query shape, translations and inheritance, grouping and scoring, indexed vs unindexed predicates, core entities. Every scenario states the DAL behaviour it represents and the exact total it must return per tier; [CORPUS.md](CORPUS.md) is the coverage matrix and the dataset rules the expectations rest on.
+
 ## Development
 
 Contributor and agent documentation — repository layout, commands, design rules, and the four-layer testing model — lives in [AGENTS.md](AGENTS.md), with package-specific rules in [bundle/AGENTS.md](bundle/AGENTS.md) and [lib/AGENTS.md](lib/AGENTS.md). The `CLAUDE.md` files are symlinks to their sibling `AGENTS.md`.

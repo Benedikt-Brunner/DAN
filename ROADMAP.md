@@ -47,9 +47,10 @@ Deliberately skipped: interfaces/fakes for boundary classes (`DockerDatabaseMana
 ## Phase 4 — Corpus & dataset breadth
 
 - [x] Synthetic-entity foundation: let Shopware compile the generated repository, install the probe-owned schema, seed typed JSON payloads, and measure JSON-path Criteria.
-- [ ] Additional synthetic shapes: inheritance, translations, deep to-many chains and heavy many-to-many.
-- [ ] Seeder graph beyond products/categories: orders with line items + deliveries and customers. Bump `SnapshotCache::SEEDER_VERSION` with every seeder-output change.
-- [ ] Corpus breadth: order/customer scenarios and aggregation-heavy scenarios.
+- [x] **Corpus coverage matrix** (`CORPUS.md`): scenarios organised along general DAL dimensions (cardinality, query shape incl. deep associations, translations, inheritance via product variants, grouping, scoring, post-filter + aggregation, count sorting, indexed vs unindexed predicates; products, categories, reviews, media, synthetic blobs). Every scenario states its DAL behaviour and its exact expected total per tier from the `TierSpec` rules; `CorpusCoverageTest` asserts totals and determinism at S.
+- [ ] Additional synthetic shapes: multi-level inheritance, non-system-language translation fallbacks, deep to-many chains and heavy many-to-many.
+- [ ] Seeder graph beyond products/categories/reviews/media: orders with line items + deliveries and customers (needs version-aware payloads across 6.5–6.7). Bump `SnapshotCache::SEEDER_VERSION` with every seeder-output change.
+- [ ] Corpus breadth: order/customer scenarios.
 
 ## Phase 5 — Exploration & reporting
 

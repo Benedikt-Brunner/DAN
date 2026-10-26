@@ -25,7 +25,7 @@ use RuntimeException;
  */
 final class SnapshotCache
 {
-    public const SEEDER_VERSION = 2;
+    public const SEEDER_VERSION = 3;
 
     public function __construct(private readonly Path $directory) {}
 

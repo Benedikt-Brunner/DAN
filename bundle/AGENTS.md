@@ -7,7 +7,7 @@ Rules specific to `bundle/` (`Dan\Probe\`), on top of the root `AGENTS.md`. The 
 Separate Composer package: run `composer install` here first. Then, from `bundle/`:
 
 ```bash
-vendor/bin/phpstan analyse    # level max, analyzed against a real shopware/core dev dependency
+vendor/bin/phpstan analyse    # level max, analyzed against real shopware/core + shopware/storefront dev dependencies
 DATABASE_URL=mysql://root:dan@127.0.0.1:3306/dan_test vendor/bin/phpunit
 # kernel integration tests self-skip when DATABASE_URL is unset
 ```
@@ -15,7 +15,7 @@ DATABASE_URL=mysql://root:dan@127.0.0.1:3306/dan_test vendor/bin/phpunit
 ## Constraints
 
 - **Low PHP floor (currently 8.2), regardless of the harness's.** The probe runs inside runtimes for every supported DAL version (`shopware/core >=6.5`, no upper bound). No newer PHP syntax in `bundle/src/`, and no API used may be unavailable anywhere in that Shopware range — verify against the range, not just the installed dev dependency.
-- **Corpus scenarios use only the public Criteria API** — no Shopware internals. Scenarios live in `Scenario\Corpus`, are tagged `dan.scenario`, and declare their entity via the definition's `ENTITY_NAME` constant.
+- **Corpus scenarios use only the public Criteria API** — no Shopware internals. Scenarios live in `Scenario\Corpus`, are tagged `dan.scenario`, and declare their entity via the definition's `ENTITY_NAME` constant. Every scenario states the general DAL behaviour it represents (`describe()`) and its exact expected total per tier (`expectedTotal()`), derived from the `TierSpec` dataset rules — never hard-coded numbers, never the optimization it was written for. Map it to a cell of `CORPUS.md`; `CorpusMatrixTest` fails on a scenario the matrix does not list.
 - **Shopware constructs the repositories; DAN only defines entity shapes.** Synthetic entity definitions are autoconfigured; Shopware's `EntityCompilerPass` generates `<entity>.repository` with the correct constructor for that runtime. Never hand-build an `EntityRepository` or add a version-tolerant repository factory. Schema DDL lives in a dedicated installer (`SyntheticSchemaInstaller`), never as a side effect of seeding.
 - **Seeding is deterministic and idempotent:** deterministic ids (`DeterministicId`), fixed data, upserts. Any change that alters seeder output — payloads, ordering, chunking, row counts — requires bumping `SnapshotCache::SEEDER_VERSION` in the harness. Behavior-preserving refactors must state that no bump is needed and why.
 - **Recording rides the kernel connection.** The recording middleware is injected where Shopware injects its own profiler middleware: `bin/dan-console` (staged by the harness) builds the connection via `MySQLFactory::create([...])` and passes it to `KernelFactory::create()`, so the measured connection *is* the system connection — one session, kernel-applied session variables, nothing mirrored. `RecordingBootstrap` hands the shared `QueryRecorder` across the pre-container boundary. Never build a second connection for recording.
