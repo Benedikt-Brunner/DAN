@@ -41,13 +41,51 @@ Delta: estimated median shift with its 95% bootstrap interval. "no interval": a 
 
 ## Query plans of changed statements
 
-Captured with `EXPLAIN FORMAT=JSON` after timing, bound to the parameter values the DAL used. Row counts are the optimizer's estimates.
+Captured after timing, bound to the parameter values the DAL used. The plan columns read the optimizer's estimated plan (`EXPLAIN FORMAT=JSON`), so their row counts are estimates; what each plan actually did on one more execution (`EXPLAIN ANALYZE`) follows the table as the engine printed it.
 
-| Cell | Statement | Plan A | Plan B | Material changes |
+| Cell | Statement | Baseline plan | Candidate plan | Material changes |
 |---|---|---|---|---|
 | product.deep-read / S / mysql-8.0 | ~1 | ref product via idx_product_number (~1 rows) | ALL product (~1000 rows); temporary table; filesort | product: access ref -> ALL; product: index idx_product_number -> none; product: ~1 -> ~1000 rows; temporary table introduced; filesort introduced |
 | product.deep-read / S / mysql-8.0 | ~3 | eq_ref product via PRIMARY (~1 rows) | eq_ref product via PRIMARY (~1 rows) | none |
 | product.deep-read / S / mysql-8.0 | +4 | no statement | not explainable | n/a |
+
+<details>
+<summary>EXPLAIN ANALYZE: product.deep-read / S / mysql-8.0, statement ~1</summary>
+
+Baseline:
+
+```
+-> Sort: `product`.`name`  (actual time=0.41..0.42 rows=1 loops=1)
+    -> ref on product  (cost=1.2 rows=1) (actual time=0.02..0.31 rows=1 loops=1)
+```
+
+Candidate:
+
+```
+-> Sort: `product`.`name`  (actual time=0.41..0.42 rows=1000 loops=1)
+    -> ALL on product  (cost=1.2 rows=1000) (actual time=0.02..0.31 rows=1000 loops=1)
+```
+
+</details>
+
+<details>
+<summary>EXPLAIN ANALYZE: product.deep-read / S / mysql-8.0, statement ~3</summary>
+
+Baseline:
+
+```
+-> Sort: `product`.`name`  (actual time=0.41..0.42 rows=1 loops=1)
+    -> eq_ref on product  (cost=1.2 rows=1) (actual time=0.02..0.31 rows=1 loops=1)
+```
+
+Candidate:
+
+```
+-> Sort: `product`.`name`  (actual time=0.41..0.42 rows=1 loops=1)
+    -> eq_ref on product  (cost=1.2 rows=1) (actual time=0.02..0.31 rows=1 loops=1)
+```
+
+</details>
 
 ## Block diagnostics
 

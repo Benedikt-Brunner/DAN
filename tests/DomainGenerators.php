@@ -131,7 +131,7 @@ final class DomainGenerators
         return self::boundedList(elements: Generator\tuple(
             Generator\elements(...self::SQL_SHAPES),
             Generator\bool(),
-            Generator\elements(null, ...PlanCapture::cases()),
+            Generator\elements(...PlanCapture::cases()),
         ), maxLength: 6);
     }
 
@@ -592,19 +592,20 @@ final class DomainGenerators
     }
 
     /**
-     * A plan for the position, or none when the block did not capture plans.
-     * Captured plans carry a small MySQL-shaped raw object.
+     * The plan every block captures for the position. Captured plans carry
+     * a small MySQL-shaped raw object and tree analysis.
      */
-    private static function buildQueryPlan(mixed $capture, int $index): ?QueryPlan
+    private static function buildQueryPlan(mixed $capture, int $index): QueryPlan
     {
-        if ($capture === null) {
-            return null;
-        }
         if (!$capture instanceof PlanCapture) {
             throw new LogicException('Generated value is not a PlanCapture.');
         }
 
-        return new QueryPlan(capture: $capture, raw: $capture === PlanCapture::Captured ? [
+        if ($capture !== PlanCapture::Captured) {
+            return new QueryPlan(capture: $capture, raw: null, analysis: null);
+        }
+
+        return new QueryPlan(capture: $capture, raw: [
             'query_block' => [
                 'select_id' => 1,
                 'table' => [
@@ -614,7 +615,7 @@ final class DomainGenerators
                     'rows_examined_per_scan' => $index + 1,
                 ],
             ],
-        ] : null);
+        ], analysis: sprintf('-> Index lookup on product using PRIMARY  (cost=0.35 rows=%1$d) (actual time=0.01..0.02 rows=%1$d loops=1)', $index + 1));
     }
 
     /**

@@ -234,7 +234,7 @@ final class RunComparatorTest extends TestCase
                     'rows_examined_per_scan' => 1,
                 ],
             ],
-        ]));
+        ], analysis: '-> Rows fetched before execution  (cost=0..0 rows=1) (actual time=0.0002..0.0002 rows=1 loops=1)'));
         $candidate = $this->writeRun(slot: RunSlot::Candidate, wallNs: [
             10_000_000,
             10_000_000,
@@ -247,7 +247,7 @@ final class RunComparatorTest extends TestCase
                     'rows_examined_per_scan' => 1000,
                 ],
             ],
-        ]));
+        ], analysis: '-> Table scan on product  (cost=101 rows=1000) (actual time=0.03..0.21 rows=1000 loops=1)'));
 
         $cell = RunComparator::compare(baseline: $baseline, candidate: $candidate)->cells[0];
 
@@ -281,6 +281,20 @@ final class RunComparatorTest extends TestCase
         self::assertSame([], RunComparator::compare(baseline: $baseline, candidate: $candidate)->datasetDivergences);
         self::assertSame(['S--mysql-8.0.json'], $baseline->datasetFileNames());
         self::assertSame(1000, $baseline->readDatasetByFileName('S--mysql-8.0.json')->fingerprint->aspects[0]->rows);
+    }
+
+    public function testACellWhoseDatasetOneRunNeverFingerprintedIsDivergent(): void
+    {
+        // Comparing fingerprints only where both exist would let a run
+        // without one pass as equivalent - nothing was proven.
+        $baseline = $this->writeRun(slot: RunSlot::Baseline, wallNs: [10_000_000], sql: 'SELECT 1');
+        $candidate = $this->writeRun(slot: RunSlot::Candidate, wallNs: [10_000_000], sql: 'SELECT 1', recordDataset: false);
+
+        $divergences = RunComparator::compare(baseline: $baseline, candidate: $candidate)->datasetDivergences;
+
+        self::assertCount(1, $divergences);
+        self::assertSame(Tier::S, $divergences[0]->tier);
+        self::assertSame(['no dataset fingerprint recorded in the candidate run - equivalence unproven'], $divergences[0]->differences);
     }
 
     private static function dataset(int $products, string $productChecksum): DatasetFingerprint
@@ -325,7 +339,7 @@ final class RunComparatorTest extends TestCase
      * @param list<int> $wallNs integer nanoseconds of the single block written when $blocks is empty
      * @param list<array{int, list<int>}> $blocks execution order plus wall samples per block, in block-index order
      */
-    private function writeRun(RunSlot $slot, array $wallNs, string $sql, array $blocks = [], ?ResultSet $resultSet = null, ?QueryPlan $plan = null, ?DatasetFingerprint $dataset = null): RunDirectory
+    private function writeRun(RunSlot $slot, array $wallNs, string $sql, array $blocks = [], ?ResultSet $resultSet = null, ?QueryPlan $plan = null, ?DatasetFingerprint $dataset = null, bool $recordDataset = true): RunDirectory
     {
         $database = new DatabaseTarget(engine: Engine::MySql, version: '8.0');
         $protocol = new Protocol(
@@ -356,7 +370,9 @@ final class RunComparatorTest extends TestCase
                 databaseNetworkPath: DatabaseNetworkPath::PublishedPort,
             ),
         ));
-        $run->writeDataset(new RecordedDataset(tier: Tier::S, database: $database, fingerprint: $dataset ?? self::dataset(products: 1000, productChecksum: '11-11')));
+        if ($recordDataset) {
+            $run->writeDataset(new RecordedDataset(tier: Tier::S, database: $database, fingerprint: $dataset ?? self::dataset(products: 1000, productChecksum: '11-11')));
+        }
         if ($blocks === []) {
             $blocks = [
                 [
@@ -383,7 +399,7 @@ final class RunComparatorTest extends TestCase
                 resultSetConsistent: true,
                 wallSamples: SampleCollection::fromArray($blockWallNs),
                 statements: StatementProfileCollection::create([
-                    new StatementProfile(index: 0, sql: $sql, durationSamples: SampleCollection::fromArray($blockWallNs), observed: count($blockWallNs), divergence: StatementDivergence::None, plan: $plan),
+                    new StatementProfile(index: 0, sql: $sql, durationSamples: SampleCollection::fromArray($blockWallNs), observed: count($blockWallNs), divergence: StatementDivergence::None, plan: $plan ?? new QueryPlan(capture: PlanCapture::Unsupported, raw: null, analysis: null)),
                 ]),
             );
         }

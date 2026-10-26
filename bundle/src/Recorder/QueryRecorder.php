@@ -35,8 +35,11 @@ final class QueryRecorder
         return $this->active ? Timestamp::now() : null;
     }
 
-    /** @param array<mixed>|null $params */
-    public function finishStatement(string $sql, ?array $params, ?Timestamp $startedAt): void
+    /**
+     * @param array<mixed>|null $params
+     * @param array<int|string, int>|null $types
+     */
+    public function finishStatement(string $sql, ?array $params, ?array $types, ?Timestamp $startedAt): void
     {
         if ($startedAt === null) {
             return;
@@ -45,6 +48,7 @@ final class QueryRecorder
         $this->records[] = new RecordedStatement(
             sql: $sql,
             params: $params,
+            types: $types,
             duration: $startedAt->elapsed(),
         );
     }

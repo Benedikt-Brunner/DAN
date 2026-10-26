@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Dan\Harness\Tests\RunStore\Artifact;
 
 use Dan\Harness\Measurement\Result\SampleCollection;
+use Dan\Harness\Plan\QueryPlan;
 use Dan\Harness\RunStore\Artifact\StatementProfile;
+use Dan\Lib\Protocol\PlanCapture;
 use Dan\Lib\Protocol\StatementDivergence;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -30,6 +32,19 @@ final class StatementProfileTest extends TestCase
             30,
         ], $merged->durationSamples->toNsArray());
         self::assertSame(StatementDivergence::None, $merged->divergence);
+    }
+
+    public function testMergeKeepsTheEarlierBlocksPlan(): void
+    {
+        // Every block captures a plan, and ANALYZE timings differ between
+        // them: the pooled profile keeps the first, never the later one.
+        $earlier = self::captured(analysis: '-> Table scan on product  (actual time=0.10..0.20 rows=10 loops=1)');
+        $later = self::captured(analysis: '-> Table scan on product  (actual time=0.30..0.40 rows=10 loops=1)');
+
+        $merged = self::profile(sql: 'SELECT 1', samples: [10], observed: 1, plan: $earlier)
+            ->merge(self::profile(sql: 'SELECT 1', samples: [20], observed: 1, plan: $later));
+
+        self::assertSame($earlier->toArray(), $merged->plan->toArray());
     }
 
     public function testMergingDifferentSqlIsTextDivergenceNotPresence(): void
@@ -91,7 +106,7 @@ final class StatementProfileTest extends TestCase
     /**
      * @param list<int> $samples
      */
-    private static function profile(string $sql, array $samples, int $observed, StatementDivergence $divergence = StatementDivergence::None): StatementProfile
+    private static function profile(string $sql, array $samples, int $observed, StatementDivergence $divergence = StatementDivergence::None, ?QueryPlan $plan = null): StatementProfile
     {
         return new StatementProfile(
             index: 0,
@@ -99,7 +114,12 @@ final class StatementProfileTest extends TestCase
             durationSamples: SampleCollection::fromArray($samples),
             observed: $observed,
             divergence: $divergence,
-            plan: null,
+            plan: $plan ?? new QueryPlan(capture: PlanCapture::Unsupported, raw: null, analysis: null),
         );
+    }
+
+    private static function captured(string $analysis): QueryPlan
+    {
+        return new QueryPlan(capture: PlanCapture::Captured, raw: ['query_block' => ['select_id' => 1]], analysis: $analysis);
     }
 }

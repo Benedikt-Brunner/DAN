@@ -14,8 +14,9 @@ use RuntimeException;
  * recorded SQL, the duration samples, how many iterations actually produced
  * a statement at this position, and how the position diverged (SQL text
  * varying between iterations, the position missing from some of them, or
- * both). Durations are integer nanoseconds end-to-end - exact by
- * construction; conversion to milliseconds happens only at presentation.
+ * both), and the query plan the engine chose for it. Durations are integer
+ * nanoseconds end-to-end - exact by construction; conversion to
+ * milliseconds happens only at presentation.
  *
  * @phpstan-import-type QueryPlanPayload from QueryPlan
  *
@@ -25,7 +26,7 @@ use RuntimeException;
  *     durationsNsSamples: list<int>,
  *     observed: int,
  *     divergence: string,
- *     plan: QueryPlanPayload|null
+ *     plan: QueryPlanPayload
  * }
  */
 final class StatementProfile
@@ -36,7 +37,7 @@ final class StatementProfile
         public readonly SampleCollection $durationSamples,
         public readonly int $observed,
         public readonly StatementDivergence $divergence,
-        public readonly ?QueryPlan $plan,
+        public readonly QueryPlan $plan,
     ) {}
 
     /**
@@ -57,8 +58,9 @@ final class StatementProfile
             divergence: $this->divergence->merge($other->divergence)->merge(
                 StatementDivergence::fromFlags(textDiffers: $this->sql !== $other->sql, intermittent: false),
             ),
-            // Plans are captured once per cell; whichever block has one wins.
-            plan: $this->plan ?? $other->plan,
+            // Every block captures the plan; the pooled view keeps the
+            // earliest block's, the one measured right after cell warmup.
+            plan: $this->plan,
         );
     }
 
@@ -89,7 +91,7 @@ final class StatementProfile
             'durationsNsSamples' => $this->durationSamples->toNsArray(),
             'observed' => $this->observed,
             'divergence' => $this->divergence->value,
-            'plan' => $this->plan?->toArray(),
+            'plan' => $this->plan->toArray(),
         ];
     }
 
@@ -104,7 +106,7 @@ final class StatementProfile
             durationSamples: SampleCollection::fromArray($payload['durationsNsSamples']),
             observed: $payload['observed'],
             divergence: StatementDivergence::tryFrom($payload['divergence']) ?? throw new RuntimeException(sprintf('Malformed statement profile: unknown divergence "%s".', $payload['divergence'])),
-            plan: $payload['plan'] === null ? null : QueryPlan::fromDecodedArray($payload['plan']),
+            plan: QueryPlan::fromArray($payload['plan']),
         );
     }
 
@@ -119,7 +121,7 @@ final class StatementProfile
         $observed = $payload['observed'] ?? null;
         $divergence = $payload['divergence'] ?? null;
         $plan = $payload['plan'] ?? null;
-        if (!is_int($index) || !is_string($sql) || !is_array($durationSamples) || !array_is_list($durationSamples) || !is_int($observed) || !is_string($divergence) || ($plan !== null && !is_array($plan))) {
+        if (!is_int($index) || !is_string($sql) || !is_array($durationSamples) || !array_is_list($durationSamples) || !is_int($observed) || !is_string($divergence) || !is_array($plan)) {
             throw new RuntimeException('Malformed statement profile payload.');
         }
         foreach ($durationSamples as $duration) {
@@ -134,7 +136,7 @@ final class StatementProfile
             'durationsNsSamples' => $durationSamples,
             'observed' => $observed,
             'divergence' => $divergence,
-            'plan' => $plan === null ? null : QueryPlan::fromDecodedArray($plan)->toArray(),
+            'plan' => QueryPlan::fromDecodedArray($plan)->toArray(),
         ]);
     }
 }

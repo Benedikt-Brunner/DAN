@@ -33,7 +33,16 @@ final class RecordedDataset
 
     public function fileName(): string
     {
-        return sprintf('%s--%s.json', $this->tier->value, $this->database->id());
+        return self::fileNameFor(tier: $this->tier, database: $this->database);
+    }
+
+    /**
+     * Where a run keeps the fingerprint of the dataset it seeded for these
+     * grid coordinates - whether or not one was recorded.
+     */
+    public static function fileNameFor(Tier $tier, DatabaseTarget $database): string
+    {
+        return sprintf('%s--%s.json', $tier->value, $database->id());
     }
 
     /** @return RecordedDatasetPayload */

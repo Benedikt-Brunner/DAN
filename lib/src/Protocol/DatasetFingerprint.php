@@ -85,15 +85,20 @@ final class DatasetFingerprint
      */
     public static function fromDecodedArray(array $payload): self
     {
+        // The version comes first: another schema's layout must be refused
+        // as that, never misreported as a malformed payload of this one.
         $schemaVersion = $payload['schemaVersion'] ?? null;
-        $tier = $payload['tier'] ?? null;
-        $aspects = $payload['aspects'] ?? null;
-        if (!is_int($schemaVersion) || !is_string($tier) || !is_array($aspects) || !array_is_list($aspects)) {
-            throw new RuntimeException('Malformed dataset fingerprint payload.');
+        if (!is_int($schemaVersion)) {
+            throw new RuntimeException('Malformed dataset fingerprint payload: missing schema version.');
         }
         $expected = DatasetFingerprintSchemaVersion::getCurrent();
         if ($schemaVersion !== $expected->value) {
             throw new RuntimeException(sprintf('Unsupported dataset fingerprint schema version %d (expected %d).', $schemaVersion, $expected->value));
+        }
+        $tier = $payload['tier'] ?? null;
+        $aspects = $payload['aspects'] ?? null;
+        if (!is_string($tier) || !is_array($aspects) || !array_is_list($aspects)) {
+            throw new RuntimeException('Malformed dataset fingerprint payload.');
         }
         $decodedAspects = [];
         foreach ($aspects as $aspect) {

@@ -8,6 +8,7 @@ use Dan\Harness\Plan\PlanFacts;
 use Dan\Harness\Plan\QueryPlan;
 use Dan\Harness\Protocol\Engine;
 use Dan\Lib\Protocol\PlanCapture;
+use InvalidArgumentException;
 
 /**
  * The plans behind one changed statement, baseline against candidate. Both
@@ -25,6 +26,12 @@ final class StatementPlanComparison
         public readonly ?QueryPlan $baseline,
         public readonly ?QueryPlan $candidate,
     ) {
+        // Every recorded statement carries a plan outcome, so a side without
+        // a plan is exactly a side without the statement - "no statement"
+        // below can never hide a missing capture.
+        if (($statement->baselineIndex === null) !== ($baseline === null) || ($statement->candidateIndex === null) !== ($candidate === null)) {
+            throw new InvalidArgumentException('A side has a plan exactly when it has the statement.');
+        }
         $this->baselineFacts = self::facts(engine: $engine, plan: $baseline);
         $this->candidateFacts = self::facts(engine: $engine, plan: $candidate);
     }
