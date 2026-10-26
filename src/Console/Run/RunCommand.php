@@ -180,6 +180,11 @@ final class RunCommand extends Command
         $output->writeln('');
         $output->writeln(sprintf('Report written to <info>%s</info>', $reportPath->toString()));
 
+        if ($comparison->datasetDivergences !== []) {
+            $output->writeln('<error>The implementations were measured over different datasets - the comparison is void.</error>');
+
+            return Command::FAILURE;
+        }
         if ($violations !== []) {
             $output->writeln(sprintf('<error>Gate failed with %d violation(s).</error>', count($violations)));
 

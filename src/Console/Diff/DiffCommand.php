@@ -67,6 +67,12 @@ final class DiffCommand extends Command
             $output->writeln($report);
         }
 
+        if ($comparison->datasetDivergences !== []) {
+            $output->writeln('<error>The runs were measured over different datasets - the comparison is void.</error>');
+
+            return Command::FAILURE;
+        }
+
         return $violations === [] ? Command::SUCCESS : Command::FAILURE;
     }
 }

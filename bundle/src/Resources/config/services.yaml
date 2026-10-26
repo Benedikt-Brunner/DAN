@@ -21,6 +21,7 @@ services:
             - { name: dan.scenario }
 
     Dan\Probe\Seeding\Dataset\DatasetSeeder: ~
+    Dan\Probe\Seeding\Fingerprint\DatasetFingerprinter: ~
     # The single recorder instance shared with the recording middleware that
     # bin/dan-console attaches to the kernel connection before the container
     # exists (RecordingBootstrap).
@@ -42,3 +43,4 @@ services:
     # In-app measurement agent. #[AsCommand] supplies the console.command tag.
     Dan\Probe\Execution\Command\ExecuteScenariosCommand: ~
     Dan\Probe\Seeding\Command\SeedTierCommand: ~
+    Dan\Probe\Seeding\Command\FingerprintDatasetCommand: ~
