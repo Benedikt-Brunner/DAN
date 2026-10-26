@@ -112,6 +112,24 @@ final class DatasetFingerprintTest extends TestCase
         DatasetFingerprint::fromDecodedArray($payload);
     }
 
+    public function testAForeignSchemaIsRefusedAsSuchWhateverItsLayout(): void
+    {
+        // A future version may rename or reshape every field; the refusal
+        // must name the version, not misreport a malformed payload.
+        try {
+            DatasetFingerprint::fromDecodedArray([
+                'schemaVersion' => 2,
+                'grid' => ['tier' => 'S'],
+            ]);
+        } catch (RuntimeException $refusal) {
+            self::assertSame('Unsupported dataset fingerprint schema version 2 (expected 1).', $refusal->getMessage());
+
+            return;
+        }
+
+        self::fail('A foreign schema version was accepted.');
+    }
+
     public function testRefusesMalformedAspects(): void
     {
         $this->expectException(RuntimeException::class);

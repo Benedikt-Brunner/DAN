@@ -14,6 +14,7 @@ use Dan\Harness\Measurement\Scheduling\RunSlot;
 use Dan\Harness\Protocol\Engine;
 use Dan\Harness\RunStore\Artifact\BlockResultCollection;
 use Dan\Harness\RunStore\Artifact\CellResult;
+use Dan\Harness\RunStore\Artifact\RecordedDataset;
 use Dan\Harness\RunStore\Artifact\StatementProfile;
 use Dan\Harness\RunStore\Artifact\StatementProfileCollection;
 use Dan\Harness\RunStore\Filesystem\RunDirectory;
@@ -48,7 +49,7 @@ final class RunComparator
             candidateManifest: $candidateManifest,
             protocolsMatch: $baselineManifest->protocol->equals($candidateManifest->protocol),
             environmentsComparable: $baselineManifest->environment->comparableTo($candidateManifest->environment),
-            datasetDivergences: self::datasetDivergences(baseline: $baseline, candidate: $candidate),
+            datasetDivergences: self::datasetDivergences(baseline: $baseline, candidate: $candidate, cells: $cells),
             cells: $cells,
             cellsOnlyInBaseline: array_values(array_diff($baselineFiles, $candidateFiles)),
             cellsOnlyInCandidate: array_values(array_diff($candidateFiles, $baselineFiles)),
@@ -56,24 +57,43 @@ final class RunComparator
     }
 
     /**
-     * The seeded datasets both runs recorded fingerprints for, wherever the
-     * fingerprints disagree. A dataset fingerprinted on one side only is not
-     * a divergence - there is nothing to compare it with.
+     * The datasets behind the compared cells, wherever the two runs cannot
+     * show they seeded them identically: the fingerprints disagree, or a run
+     * recorded none - equivalence that was never measured is not proven, so
+     * a missing fingerprint fails the comparison like a different one.
+     *
+     * @param list<CellComparison> $cells
      *
      * @return list<DatasetDivergence>
      */
-    private static function datasetDivergences(RunDirectory $baseline, RunDirectory $candidate): array
+    private static function datasetDivergences(RunDirectory $baseline, RunDirectory $candidate, array $cells): array
     {
+        /** @var array<string, CellComparison> $datasets one compared cell per dataset it was measured on */
+        $datasets = [];
+        foreach ($cells as $cell) {
+            $datasets[RecordedDataset::fileNameFor(tier: $cell->tier, database: $cell->database)] ??= $cell;
+        }
+        $baselineFiles = $baseline->datasetFileNames();
+        $candidateFiles = $candidate->datasetFileNames();
+
         $divergences = [];
-        foreach (array_intersect($baseline->datasetFileNames(), $candidate->datasetFileNames()) as $fileName) {
-            $baselineDataset = $baseline->readDatasetByFileName($fileName);
-            $differences = $baselineDataset->fingerprint->differences($candidate->readDatasetByFileName($fileName)->fingerprint);
+        foreach ($datasets as $fileName => $cell) {
+            $missing = [];
+            if (!in_array($fileName, $baselineFiles, true)) {
+                $missing[] = sprintf('no dataset fingerprint recorded in the %s run - equivalence unproven', RunSlot::Baseline->value);
+            }
+            if (!in_array($fileName, $candidateFiles, true)) {
+                $missing[] = sprintf('no dataset fingerprint recorded in the %s run - equivalence unproven', RunSlot::Candidate->value);
+            }
+            $differences = $missing !== []
+                ? $missing
+                : $baseline->readDatasetByFileName($fileName)->fingerprint->differences($candidate->readDatasetByFileName($fileName)->fingerprint);
             if ($differences === []) {
                 continue;
             }
             $divergences[] = new DatasetDivergence(
-                tier: $baselineDataset->tier,
-                database: $baselineDataset->database,
+                tier: $cell->tier,
+                database: $cell->database,
                 differences: $differences,
             );
         }
