@@ -46,6 +46,8 @@ final class ProductStockRangeScenario implements Scenario
         $criteria->addFilter(new EqualsFilter('parentId', null));
         $criteria->addFilter(new RangeFilter('stock', [RangeFilter::GTE => 990]));
         $criteria->addSorting(new FieldSorting('stock', FieldSorting::DESCENDING));
+        // Stock repeats every 1,000 products: the unique id makes the page deterministic.
+        $criteria->addSorting(new FieldSorting('id', FieldSorting::ASCENDING));
         $criteria->setLimit(50);
 
         return $criteria;

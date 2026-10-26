@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace Dan\Probe\Tests\Scenario;
 
 use Dan\Lib\Protocol\Tier;
+use Dan\Probe\DanProbeBundle;
 use Dan\Probe\Scenario\Scenario;
+use Dan\Probe\Scenario\ScenarioRegistry;
 use Dan\Probe\Seeding\Dataset\TierSpec;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
+use Symfony\Component\DependencyInjection\ContainerBuilder;
 
 /**
  * The corpus as a system, without a database: every scenario is registered,
@@ -19,15 +22,27 @@ use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
  */
 final class CorpusMatrixTest extends TestCase
 {
-    public function testEveryCorpusScenarioIsRegisteredExactlyOnce(): void
+    public function testTheCompiledRegistryServesEveryCorpusScenarioExactlyOnce(): void
     {
-        $classes = self::corpusClasses();
-        $services = (string) file_get_contents(__DIR__ . '/../../src/Resources/config/services.yaml');
-
-        self::assertNotSame([], $classes);
-        foreach ($classes as $class) {
-            self::assertSame(1, substr_count($services, '    ' . $class . ":\n"), sprintf('%s must be tagged dan.scenario exactly once.', $class));
+        $container = new ContainerBuilder();
+        (new DanProbeBundle())->build($container);
+        // Compile only the registry and what it collects: every other probe
+        // service depends on Shopware services this container does not have.
+        foreach ($container->getDefinitions() as $id => $definition) {
+            if ($id !== ScenarioRegistry::class && !$definition->hasTag('dan.scenario') && !$definition->isSynthetic()) {
+                $container->removeDefinition($id);
+            }
         }
+        $container->getDefinition(ScenarioRegistry::class)->setPublic(true);
+        $container->compile();
+
+        $registry = $container->get(ScenarioRegistry::class);
+        self::assertInstanceOf(ScenarioRegistry::class, $registry);
+        $registered = array_map(fn (Scenario $scenario): string => $scenario::class, $registry->matching(filter: null));
+        sort($registered);
+
+        self::assertNotSame([], $registered);
+        self::assertSame(self::corpusClasses(), $registered, 'Every corpus scenario must be tagged dan.scenario exactly once.');
     }
 
     public function testScenarioNamesAreUniqueAndEveryOneIsInTheCoverageMatrix(): void

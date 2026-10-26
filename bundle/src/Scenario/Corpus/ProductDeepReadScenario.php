@@ -46,6 +46,8 @@ final class ProductDeepReadScenario implements Scenario
         $criteria->addAssociation('tax');
         $criteria->addAssociation('prices');
         $criteria->addSorting(new FieldSorting('stock', FieldSorting::DESCENDING));
+        // Variants share their parent's stock: the unique id makes the page deterministic.
+        $criteria->addSorting(new FieldSorting('id', FieldSorting::ASCENDING));
         $criteria->setLimit(50);
 
         return $criteria;
