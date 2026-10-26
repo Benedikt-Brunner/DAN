@@ -49,6 +49,9 @@ final class CorpusCoverageTest extends TestCase
         $context = Context::createDefaultContext();
         $spec = TierSpec::forTier(Tier::S);
 
+        // DDL implicitly commits in MySQL: create the table before the
+        // transaction, or the rollback below would have nothing to undo.
+        $installer->install();
         $connection->beginTransaction();
         try {
             $seeder->seed(spec: $spec, context: $context, progress: new class implements SeedProgressReporter {

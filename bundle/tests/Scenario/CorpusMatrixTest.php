@@ -9,6 +9,8 @@ use Dan\Probe\Scenario\Scenario;
 use Dan\Probe\Seeding\Dataset\TierSpec;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
+use Shopware\Core\Framework\Context;
+use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 
 /**
  * The corpus as a system, without a database: every scenario is registered,
@@ -55,6 +57,21 @@ final class CorpusMatrixTest extends TestCase
                 $total = $scenario->expectedTotal($spec);
                 self::assertGreaterThanOrEqual(0, $total, $scenario->name());
                 self::assertLessThanOrEqual($tableSizes[$scenario->entity()] ?? 0, $total, sprintf('%s at %s cannot exceed its table.', $scenario->name(), $tier->value));
+            }
+        }
+    }
+
+    public function testWithoutAnExactCountNoTierExpectsMoreThanOnePage(): void
+    {
+        $context = Context::createDefaultContext();
+        foreach (self::corpus() as $scenario) {
+            $criteria = $scenario->criteria($context);
+            $limit = $criteria->getLimit();
+            if ($criteria->getTotalCountMode() !== Criteria::TOTAL_COUNT_MODE_NONE || $limit === null) {
+                continue;
+            }
+            foreach (Tier::cases() as $tier) {
+                self::assertLessThanOrEqual($limit, $scenario->expectedTotal(TierSpec::forTier($tier)), sprintf('%s at %s: the DAL reports only the loaded page as the total.', $scenario->name(), $tier->value));
             }
         }
     }

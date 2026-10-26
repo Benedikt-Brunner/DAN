@@ -53,6 +53,7 @@ final class ProductStockRangeScenario implements Scenario
 
     public function expectedTotal(TierSpec $spec): int
     {
-        return $spec->countProducts(fn (int $index, bool $variant): bool => !$variant && $spec->productStock($index) >= 990);
+        // No exact total count: the DAL reports the page it loaded.
+        return min(50, $spec->countProducts(fn (int $index, bool $variant): bool => !$variant && $spec->productStock($index) >= 990));
     }
 }

@@ -2,7 +2,7 @@
 
 The built-in scenario corpus (`bundle/src/Scenario/Corpus`) is organised along general DAL dimensions, not along optimizations someone wanted to prove. Every scenario states the DAL behaviour it represents (`Scenario::describe()`) and the exact total it must return per tier (`Scenario::expectedTotal()`), derived from the same dataset rules the seeder writes with (`TierSpec`). A new DAL optimization PR should find its workload here; a scenario that only exists to make one patch look good does not belong in the corpus (checkout-local scenarios are the roadmap's answer for that).
 
-Every scenario runs on every dataset tier (S / M / L) and every supported engine (MySQL, MariaDB) — those two dimensions are the grid, not the corpus. The kernel test `CorpusCoverageTest` seeds tier S and asserts every scenario's total and determinism against it; the M and L expectations follow from the same formulas and are checked at run time through the recorded result set.
+Every scenario runs on every dataset tier (S / M / L) and every supported engine (MySQL, MariaDB) — those two dimensions are the grid, not the corpus. The kernel test `CorpusCoverageTest` seeds tier S and asserts every scenario's total and determinism against it; the M and L expectations follow from the same formulas, which `CorpusMatrixTest` checks against each tier's table sizes and page limits but nothing compares with a seeded M or L dataset.
 
 ## Dimensions and the scenarios covering them
 
@@ -18,8 +18,8 @@ Every scenario runs on every dataset tier (S / M / L) and every supported engine
 | Query shape | many-to-many | `product.in-category` | filter through a mapping table by associated id |
 | Query shape | deep association | `review.deep-association` | filter three joins deep into a translated field, load the product |
 | Translations | translated field filter/sort | `product.keyword-listing`, `category.translated-name` | translation join with system-language fallback |
-| Inheritance | inherited field on variants | `product.inherited-name` | value resolved through the parent (inheritance-aware context) |
-| Inheritance | inherited association on variants | `product.in-category`, `product.keyword-listing` | variants found through their parent's categories / name |
+| Inheritance | inherited field on variants | `product.inherited-name`, `product.keyword-listing` | value resolved through the parent (inheritance-aware context) |
+| Inheritance | inherited association on variants | `product.in-category` | variants found through their parent's categories |
 | Inheritance | inheritance off | `product.score-query` and every parents-only scenario | nameless children never match; no parent joins emitted |
 | Grouping | GROUP BY | `product.grouped-by-tax` | field grouping collapses rows to groups |
 | Scoring | score query | `product.score-query` | computed `_score`, ranked, query doubles as filter |
