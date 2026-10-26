@@ -12,9 +12,9 @@ final readonly class ConsoleSeedProgressReporter implements SeedProgressReporter
         private OutputInterface $output,
     ) {}
 
-    public function seeding(string $what, int $total): void
+    public function seeding(SeededRows $rows, int $total): void
     {
-        $this->output->writeln(sprintf('Seeding %d %s...', $total, $what));
+        $this->output->writeln(sprintf('Seeding %d %s...', $total, $rows->value));
     }
 
     public function seeded(int $seeded, int $total): void

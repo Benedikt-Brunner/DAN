@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Dan\Probe\Seeding\Dataset;
 
+use Dan\Probe\Seeding\Progress\SeededRows;
 use Dan\Probe\Seeding\Progress\SeedProgressReporter;
 use Dan\Probe\Synthetic\SyntheticBlobDefinition;
 use Dan\Probe\Synthetic\SyntheticSchemaInstaller;
@@ -45,22 +46,22 @@ final readonly class DatasetSeeder
         $taxId = $this->seedTax($context);
         $salesChannelId = $this->storefrontSalesChannelId($context);
 
-        $progress->seeding(what: 'categories', total: $spec->categories);
+        $progress->seeding(rows: SeededRows::Categories, total: $spec->categories);
         $this->seedCategories(spec: $spec, context: $context);
 
-        $progress->seeding(what: 'products', total: $spec->products);
+        $progress->seeding(rows: SeededRows::Products, total: $spec->products);
         $this->seedProducts(spec: $spec, taxId: $taxId, context: $context, progress: $progress);
 
-        $progress->seeding(what: 'product variants', total: $spec->variants());
+        $progress->seeding(rows: SeededRows::ProductVariants, total: $spec->variants());
         $this->seedVariants(spec: $spec, context: $context, progress: $progress);
 
-        $progress->seeding(what: 'product reviews', total: $spec->reviews);
+        $progress->seeding(rows: SeededRows::ProductReviews, total: $spec->reviews);
         $this->seedReviews(spec: $spec, salesChannelId: $salesChannelId, context: $context, progress: $progress);
 
-        $progress->seeding(what: 'media', total: $spec->media);
+        $progress->seeding(rows: SeededRows::Media, total: $spec->media);
         $this->seedMedia(spec: $spec, context: $context, progress: $progress);
 
-        $progress->seeding(what: 'synthetic blobs', total: $spec->syntheticBlobs);
+        $progress->seeding(rows: SeededRows::SyntheticBlobs, total: $spec->syntheticBlobs);
         $this->seedSyntheticBlobs(spec: $spec, context: $context, progress: $progress);
         $progress->finished();
     }

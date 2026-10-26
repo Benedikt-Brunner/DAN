@@ -9,6 +9,7 @@ use Dan\Probe\Execution\Measurement\ScenarioMeasurer;
 use Dan\Probe\Scenario\Scenario;
 use Dan\Probe\Seeding\Dataset\DatasetSeeder;
 use Dan\Probe\Seeding\Dataset\TierSpec;
+use Dan\Probe\Seeding\Progress\SeededRows;
 use Dan\Probe\Seeding\Progress\SeedProgressReporter;
 use Dan\Probe\Synthetic\SyntheticSchemaInstaller;
 use Doctrine\DBAL\Connection;
@@ -55,7 +56,7 @@ final class CorpusCoverageTest extends TestCase
         $connection->beginTransaction();
         try {
             $seeder->seed(spec: $spec, context: $context, progress: new class implements SeedProgressReporter {
-                public function seeding(string $what, int $total): void {}
+                public function seeding(SeededRows $rows, int $total): void {}
 
                 public function seeded(int $seeded, int $total): void {}
 
